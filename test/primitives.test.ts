@@ -1,10 +1,28 @@
 import { describe, expect, test } from "bun:test"
 import { imageAttrs, type Image } from "../src/images"
+import { searchString, shopCatalog, visibleProducts } from "../src/primitives/catalog"
+import { shopMarketSelector } from "../src/primitives/market-selector"
 import { shopPrice } from "../src/primitives/price"
 import { shopProductMedia } from "../src/primitives/product-media"
 import { shopBundle, shopProduct } from "../src/primitives/product"
+import { shopRecommendations } from "../src/primitives/recommendations"
+import { shopSearch } from "../src/primitives/search"
+import { shopPay } from "../src/primitives/shop-pay"
+import { addBusinessDays, shopPromise } from "../src/primitives/shop-promise"
 import { shopVariantSelector } from "../src/primitives/variant-selector"
-import { nextVariant, valueStatus, choicesOf, type Variant } from "../src/variants"
+import { configureShop, shopConfig, shopPayUrl } from "../src/shop"
+import {
+  choicesOf,
+  discountPercent,
+  isOnSale,
+  nextVariant,
+  numericGid,
+  savingsAmount,
+  swatchImageOf,
+  valueStatus,
+  variantName,
+  type Variant,
+} from "../src/variants"
 
 const money = (amount: string) => ({ amount, currencyCode: "USD" })
 const variant = (id: string, size: string, color: string, available = true): Variant => ({
@@ -48,8 +66,10 @@ describe("variant model", () => {
     expect(nextVariant(variants, variants[2], "Size", "M")?.id).toBe("m-blue")
     expect(nextVariant(variants, variants[0], "Size", "M")?.id).toBe("m-red")
   })
-  test("a lone Default Title is no choice", () => {
+  test("a lone Default Title, Default, or single-value option is no choice", () => {
     expect(choicesOf([{ name: "Title", values: ["Default Title"] }, ...productOptions])).toHaveLength(2)
+    expect(choicesOf([{ name: "Title", values: ["Default"] }, { name: "Size", values: ["One Size"] }, ...productOptions])).toHaveLength(2)
+    expect(variantName({ ...variants[0], title: "Default", selectedOptions: [{ name: "Title", value: "Default" }] })).toBe("")
   })
 })
 
@@ -141,12 +161,47 @@ describe("images", () => {
 })
 
 describe("shop-price", () => {
-  test("on sale only while the earlier price is higher, in the same currency", () => {
-    expect(shopPrice({ id: "p", price: money("30"), compareAtPrice: money("40") }).api.isOnSale()).toBe(true)
+  test("on sale only while the earlier price is higher, in the same currency, with discount percent", () => {
+    const sale = shopPrice({ id: "p", price: money("199"), compareAtPrice: money("499") })
+    expect(sale.api.isOnSale()).toBe(true)
+    expect(sale.api.getDiscountPercent()).toBe(60)
     expect(shopPrice({ id: "p", price: money("40"), compareAtPrice: money("40") }).api.isOnSale()).toBe(false)
+    expect(shopPrice({ id: "p", price: money("40"), compareAtPrice: money("40") }).api.getDiscountPercent()).toBeNull()
     expect(
       shopPrice({ id: "p", price: money("30"), compareAtPrice: { amount: "40", currencyCode: "CAD" } }).api.isOnSale(),
     ).toBe(false)
+  })
+})
+
+describe("shop-catalog", () => {
+  test("combines free text with product_type and vendor field terms", () => {
+    expect(searchString("", null)).toBeNull()
+    expect(searchString(" freeride ", null)).toBe("freeride")
+    expect(searchString("arbor", "Snowboard")).toBe('arbor product_type:"Snowboard"')
+    expect(searchString("", "Snowboard", "Never Summer")).toBe('product_type:"Snowboard" vendor:"Never Summer"')
+  })
+  test("validates filters, sorts, vendor, onSale and reset", () => {
+    const catalog = shopCatalog({ id: "c", endpoint: "", filters: ["Snowboard", "Binding"], defaultSort: "featured" })
+    expect(catalog.api.setFilter("snowboard")).toBe(true)
+    expect(catalog.get().filter).toBe("Snowboard")
+    expect(catalog.api.setFilter("Unknown")).toBe(false)
+    expect(catalog.api.setVendor("Arbor")).toBe(true)
+    expect(catalog.get().vendor).toBe("Arbor")
+    expect(catalog.api.setOnSale(true)).toBe(true)
+    expect(catalog.get().onSale).toBe(true)
+    expect(catalog.api.setSort("price-low")).toBe(true)
+    expect(catalog.get().sort).toBe("price-low")
+    expect(catalog.api.reset()).toBe(true)
+    expect(catalog.get()).toMatchObject({ query: "", filter: null, vendor: null, onSale: false })
+    catalog.destroy()
+  })
+  test("filters visible products when onSale is active", () => {
+    const items = [
+      { id: "1", handle: "a", title: "A", vendor: "Arbor", productType: "Snowboard", tags: [], availableForSale: true, featuredImage: null, price: money("199"), compareAtPrice: money("499"), variants: [] },
+      { id: "2", handle: "b", title: "B", vendor: "Arbor", productType: "Snowboard", tags: [], availableForSale: true, featuredImage: null, price: money("199"), compareAtPrice: null, variants: [] },
+    ]
+    expect(visibleProducts({ products: items, onSale: false } as never)).toHaveLength(2)
+    expect(visibleProducts({ products: items, onSale: true } as never).map((p) => p.id)).toEqual(["1"])
   })
 })
 
@@ -188,5 +243,116 @@ describe("shop-product and shop-bundle", () => {
         { variantId: "l-blue", quantity: 1, attributes },
       ],
     ])
+  })
+})
+
+describe("price, gid and swatch helpers", () => {
+  test("computes sale state, discount percent, savings, numeric GIDs and swatch images", () => {
+    expect(isOnSale(money("199"), money("499"))).toBe(true)
+    expect(discountPercent(money("199"), money("499"))).toBe(60)
+    expect(savingsAmount(money("199"), money("499"))).toEqual({ amount: "300.00", currencyCode: "USD" })
+    expect(numericGid("gid://shopify/ProductVariant/44123456789")).toBe("44123456789")
+    expect(numericGid("999")).toBe("999")
+    expect(numericGid("not-a-gid")).toBeNull()
+    const pattern = { url: "https://cdn.shopify.com/plaid.jpg", altText: "Plaid", width: 200, height: 200 }
+    expect(
+      swatchImageOf(
+        { name: "Pattern", values: ["Plaid"], optionValues: [{ name: "Plaid", swatch: { color: null, image: { previewImage: pattern } } }] },
+        "Plaid",
+      ),
+    ).toEqual(pattern)
+  })
+})
+
+describe("shop-pay", () => {
+  test("builds Shop Pay permalink URLs and cart checkout URLs", () => {
+    expect(
+      shopPayUrl(
+        [{ variantId: "gid://shopify/ProductVariant/12345", quantity: 2 }],
+        "https://www.snowdevil.ca/api/2026-10/graphql.json",
+      ),
+    ).toBe("https://www.snowdevil.ca/cart/12345:2?payment=shop_pay")
+    expect(shopPayUrl({ checkoutUrl: "https://www.snowdevil.ca/cart/c/abc123" })).toBe(
+      "https://www.snowdevil.ca/cart/c/abc123?payment=shop_pay",
+    )
+  })
+  test("computes installments within bounds and supports cancelable checkout", () => {
+    let cancel = true
+    const pay = shopPay({
+      id: "pay",
+      endpoint: "https://www.snowdevil.ca/api/2026-10/graphql.json",
+      lines: [{ variantId: "gid://shopify/ProductVariant/12345", quantity: 1 }],
+      price: money("200"),
+      onCheckout: (_, details) => cancel && details.cancel(),
+    })
+    expect(pay.api.isReady()).toBe(true)
+    expect(pay.api.getInstallment()).toMatchObject({ eligible: true, each: { amount: "50.00", currencyCode: "USD" } })
+    expect(pay.api.checkout()).toBeNull()
+    cancel = false
+    expect(pay.api.checkout()).toBe("https://www.snowdevil.ca/cart/12345:1?payment=shop_pay")
+    const cheap = shopPay({ id: "cheap", price: money("20") })
+    expect(cheap.api.getInstallment().eligible).toBe(false)
+  })
+})
+
+describe("shop-promise", () => {
+  test("skips weekends, honors cutoff hour and hides when sold out", () => {
+    // Friday Nov 20, 2026 at 10:00 (before 14:00 cutoff): +2 business days => Tue Nov 24
+    const fridayMorning = new Date(2026, 10, 20, 10, 0, 0).getTime()
+    expect(addBusinessDays(new Date(fridayMorning), 2).getDay()).toBe(2)
+    const before = shopPromise({ id: "p1", now: fridayMorning, minDays: 2, maxDays: 2, cutoffHour: 14, locale: "en-US" })
+    expect(before.api.isEligible()).toBe(true)
+    expect(before.api.getEstimate().dateText).toContain("Nov 24")
+
+    // Friday Nov 20, 2026 at 16:00 (after cutoff): +3 business days => Wed Nov 25
+    const fridayAfternoon = new Date(2026, 10, 20, 16, 0, 0).getTime()
+    const after = shopPromise({ id: "p2", now: fridayAfternoon, minDays: 2, maxDays: 2, cutoffHour: 14, locale: "en-US" })
+    expect(after.api.getEstimate().dateText).toContain("Nov 25")
+
+    const soldOut = shopPromise({ id: "p3", available: false })
+    expect(soldOut.api.isEligible()).toBe(false)
+    expect(soldOut.api.getEstimate().message).toBe("")
+  })
+})
+
+describe("shop-market-selector", () => {
+  test("validates countries, updates shopConfig and supports cancelable changes", () => {
+    const prev = shopConfig()
+    const countries = [
+      { isoCode: "US", name: "United States", currency: { isoCode: "USD", symbol: "$" } },
+      { isoCode: "CA", name: "Canada", currency: { isoCode: "CAD", symbol: "$" } },
+      { isoCode: "DE", name: "Germany", currency: { isoCode: "EUR", symbol: "€" } },
+    ]
+    let cancel = true
+    const market = shopMarketSelector({
+      id: "mkt",
+      countries,
+      defaultCountry: "US",
+      onCountryChange: (_, details) => cancel && details.cancel(),
+    })
+    expect(market.api.setCountry("ZZ")).toBe(false)
+    expect(market.api.setCountry("CA")).toBe(false)
+    expect(market.api.getMarket().country).toBe("US")
+    cancel = false
+    expect(market.api.setCountry("DE")).toBe(true)
+    expect(market.api.getMarket()).toMatchObject({ country: "DE", currency: "EUR", symbol: "€" })
+    expect(shopConfig().country).toBe("DE")
+    market.destroy()
+    configureShop({ country: prev.country, language: prev.language })
+  })
+})
+
+describe("shop-search and shop-recommendations", () => {
+  test("manages query state and empty recommendations cleanly", () => {
+    const search = shopSearch({ id: "search", endpoint: "" })
+    expect(search.api.setQuery("arbor")).toBe(true)
+    expect(search.get().query).toBe("arbor")
+    expect(search.api.clear()).toBe(true)
+    expect(search.get().query).toBe("")
+    search.destroy()
+
+    const recs = shopRecommendations({ id: "recs", productId: null })
+    expect(recs.api.getProducts()).toEqual([])
+    recs.destroy()
   })
 })

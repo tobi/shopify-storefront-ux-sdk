@@ -3,7 +3,7 @@ import "@ui-sdk/web/number-input"
 import { createParts } from "@ui-sdk/web"
 import { preloadImage, type Image } from "../images"
 import { shopBundle, shopProduct, type CartApi, type SelectorApi } from "../primitives/product"
-import { announce, fetchProduct, money, type LineInput, type Product } from "../shop"
+import { announce, fetchProduct, money, shopConfig, subscribeConfig, type LineInput, type Product } from "../shop"
 import { firstAvailable, variantName, type Variant } from "../variants"
 import { apiOf, setText } from "./util"
 
@@ -16,6 +16,9 @@ type MediaApi = {
 }
 type PriceElement = HTMLElement & { price: unknown; compareAtPrice: unknown }
 type SelectorElement = HTMLElement & { variants: Variant[]; productOptions: Product["options"] }
+type ShopPayElement = HTMLElement & { lines: LineInput[]; price: unknown; disabled: boolean; endpoint?: string }
+type ShopPromiseElement = HTMLElement & { available: boolean }
+type ShopImageElement = HTMLElement & { image: Image | null }
 
 /** The cart around an element, asked for at the moment it's needed. */
 const cartAround = (el: HTMLElement): CartApi => ({
@@ -66,6 +69,9 @@ const productParts = createParts(shopProduct, {
       const api = instance.api
       const selectorEl = own<SelectorElement>(el, "shop-variant-selector", "shop-product")[0] ?? null
       const mediaEl = own<HTMLElement>(el, "shop-product-media", "shop-product")[0] ?? null
+      const singleImageEl = own<ShopImageElement>(el, "shop-image[data-product-image]", "shop-product")[0] ?? null
+      const shopPayEls = own<ShopPayElement>(el, "shop-pay", "shop-product")
+      const promiseEls = own<ShopPromiseElement>(el, "shop-promise", "shop-product")
       const prices = own<PriceElement>(el, "shop-price", "shop-product")
       const quantity = own<Field>(el, "ui-number-input[data-quantity]", "shop-product")[0] ?? null
       const addButton =
@@ -73,6 +79,8 @@ const productParts = createParts(shopProduct, {
         (el.querySelector("[data-add]")?.closest("ui-button") as HTMLElement | null)
       const off: (() => void)[] = []
       let cancelled = false
+      let fetchController: AbortController | null = null
+      let loadedKey = ""
       let shown: Product | null = null
       let shownVariant: Variant | null = null
 
@@ -98,15 +106,30 @@ const productParts = createParts(shopProduct, {
           selectorEl.productOptions = product.options
         }
         const variant = selector.getVariant() ?? firstAvailable(product.variants)
+        if (singleImageEl) singleImageEl.image = variant?.image ?? product.featuredImage
         const media = await apiOf<MediaApi>(mediaEl)
         if (cancelled || shown !== product) return
         // Every variant's picture is in the gallery, so choosing one can show it.
         const variantImages = product.variants.flatMap((entry) => (entry.image ? [entry.image] : []))
         media?.setImages(
-          [product.featuredImage, ...product.images, ...variantImages],
+          [...(product.featuredImage ? [product.featuredImage] : []), ...product.images, ...variantImages],
           product.title,
           variant?.image?.url,
         )
+        el.dispatchEvent(new CustomEvent("productload", { bubbles: true, detail: { product } }))
+      }
+
+      function syncExtras(variant: Variant | null, qty: number) {
+        const available = Boolean(variant?.availableForSale)
+        for (const pay of shopPayEls) {
+          pay.endpoint = endpointAround(el) ?? shopConfig().endpoint
+          pay.lines = variant ? [{ variantId: variant.id, quantity: qty }] : []
+          pay.price = variant?.price ?? null
+          pay.disabled = !available
+        }
+        for (const promise of promiseEls) {
+          promise.available = available
+        }
       }
 
       // Everything that reads the variant follows the selector.
@@ -118,6 +141,10 @@ const productParts = createParts(shopProduct, {
           price.price = variant?.price ?? null
           price.compareAtPrice = variant?.compareAtPrice ?? null
         }
+        if (singleImageEl && shown) {
+          singleImageEl.image = variant?.image ?? shown.featuredImage
+        }
+        syncExtras(variant, instance.get().quantity)
         const stock = el.querySelector<HTMLElement>("[data-product-stock]")
         if (stock) {
           stock.textContent = !variant
@@ -148,15 +175,35 @@ const productParts = createParts(shopProduct, {
         const state = instance.get()
         if (state.product && state.product !== shown) void showProduct(state.product)
         if (quantity && quantity.value !== state.quantity) quantity.value = state.quantity
+        syncExtras(shownVariant, state.quantity)
       }
 
-      // `handle` loads the product from the cart's store when no `product` was given.
-      const handle = el.getAttribute("handle")
-      if (handle && !instance.get().product) {
-        void fetchProduct(handle, endpointAround(el)).then((product) => {
-          if (!cancelled && !instance.get().product) (el as HTMLElement & { product: Product }).product = product
-        })
+      // `handle` loads the product from the cart's store, and reloads when the
+      // handle or market/currency changes.
+      const loadByHandle = () => {
+        const handle = el.getAttribute("handle")?.trim()
+        if (!handle) return
+        const cfg = shopConfig()
+        const endpoint = endpointAround(el) ?? cfg.endpoint
+        const key = `${endpoint}|${cfg.country}|${cfg.language}|${handle}`
+        if (key === loadedKey) return
+        loadedKey = key
+        fetchController?.abort()
+        const mine = (fetchController = new AbortController())
+        void fetchProduct(handle, endpoint, mine.signal)
+          .then((product) => {
+            if (!cancelled && !mine.signal.aborted) {
+              ;(el as HTMLElement & { product: Product }).product = product
+            }
+          })
+          .catch(() => {})
       }
+      loadByHandle()
+      const handleObserver = new MutationObserver(loadByHandle)
+      handleObserver.observe(el, { attributes: true, attributeFilter: ["handle"] })
+      off.push(() => handleObserver.disconnect())
+      off.push(subscribeConfig(loadByHandle))
+      off.push(() => fetchController?.abort())
 
       void apiOf<SelectorApi & { subscribe: (listener: (variant: Variant | null) => void) => () => void }>(
         selectorEl,
@@ -216,7 +263,7 @@ const bundleParts = createParts(shopBundle, {
     api: ["getItems", "setVariant", "setOption", "setQuantity", "add"],
     render(el, instance) {
       const api = instance.api
-      api.internal.connect({ cart: cartAround(el) })
+      api.internal.connect({ cart: cartAround(el), limit: limitAround(el) })
       const items = [...el.querySelectorAll<ItemElement>("shop-bundle-item")]
       const quantity = own<Field>(el, "ui-number-input[data-quantity]", "shop-bundle")[0] ?? null
       const total = el.querySelector<PriceElement>("shop-price[data-bundle-total]")

@@ -8,5 +8,9 @@
     "noEmit": true,
     "types": []
   },
-  "include": ["src"]
+  "include": [
+    "src/*.ts",
+    "src/primitives/*.ts",
+    "src/web/*.ts"
+  ]
 }

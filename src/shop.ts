@@ -1,23 +1,136 @@
 /**
- * Storefront data and cart state, with no UI. Everything here is plain
- * TypeScript: the elements in `elements.ts` are the only custom elements.
+ * Storefront data access and cart state, with no UI. Everything here is plain
+ * TypeScript: the elements in `src/web/` and components in `src/solid/` and
+ * `src/react/` are the UI adapters.
  *
- * One shop per page: the cart is a module singleton, configured by the
- * `<shop-cart>` element's attributes.
+ * Non-lossy by design: preserves Shopify's full product, variant, swatch,
+ * collection, recommendation, predictive search, localization, menu, and cart
+ * structures — including server-computed line costs, automatic & code discount
+ * allocations, notes, attributes, and `@inContext(country, language)`.
  */
 
 import { imageSrcSet, imageUrl, type Image, type ImageTransform } from "./images"
-import type { Money, ProductOption, Variant } from "./variants"
+import { numericGid, type Money, type ProductOption, type SelectedOption, type Variant } from "./variants"
+
+type PriceRange = {
+  minVariantPrice: Money
+  maxVariantPrice: Money
+}
+
+type Seo = {
+  title: string | null
+  description: string | null
+}
 
 type Product = {
+  id: string
   title: string
   handle: string
   vendor: string
+  productType: string
+  tags: string[]
+  availableForSale: boolean
+  description: string
   descriptionHtml: string
+  seo: Seo
+  priceRange: PriceRange
+  compareAtPriceRange: PriceRange
   options: ProductOption[]
-  featuredImage: Image
+  featuredImage: Image | null
   images: Image[]
   variants: Variant[]
+}
+
+type ShopInfo = {
+  name: string
+  description: string | null
+  primaryDomain: { url: string; host: string }
+}
+
+type MarketCurrency = { isoCode: string; symbol: string }
+type MarketLanguage = { isoCode: string; endonymName: string }
+type MarketCountry = {
+  isoCode: string
+  name: string
+  currency: MarketCurrency
+  availableLanguages?: MarketLanguage[]
+}
+type Localization = {
+  country: MarketCountry
+  language: MarketLanguage
+  availableCountries: MarketCountry[]
+}
+
+type CollectionFilterValue = {
+  id: string
+  label: string
+  count: number
+  input: string
+}
+
+type CollectionFilter = {
+  id: string
+  label: string
+  type: string
+  values: CollectionFilterValue[]
+}
+
+type CollectionSummary = {
+  id: string
+  handle: string
+  title: string
+  description: string
+  descriptionHtml: string
+  image: Image | null
+}
+
+type ProductCardData = {
+  id: string
+  handle: string
+  title: string
+  vendor: string
+  productType: string
+  tags: string[]
+  availableForSale: boolean
+  description: string
+  featuredImage: Image | null
+  price: Money
+  maxPrice: Money
+  priceVaries: boolean
+  compareAtPrice: Money | null
+  options: ProductOption[]
+  variants: Variant[]
+}
+
+type CollectionPage = {
+  collection: CollectionSummary
+  products: ProductCardData[]
+  filters: CollectionFilter[]
+  cursor: string | null
+  hasNext: boolean
+}
+
+type PredictiveSearchQuery = { text: string; styledText: string }
+
+type PredictiveSearchResult = {
+  queries: PredictiveSearchQuery[]
+  products: ProductCardData[]
+  collections: CollectionSummary[]
+}
+
+type MenuItem = {
+  id: string
+  title: string
+  url: string | null
+  type: string
+  items: MenuItem[]
+}
+
+type ShopMenu = {
+  id: string
+  handle: string
+  title: string
+  items: MenuItem[]
 }
 
 type LineAttribute = { key: string; value: string }
@@ -25,14 +138,43 @@ type LineAttribute = { key: string; value: string }
 /** A line to add: the variant, how many, and attributes like a bundle's id. */
 type LineInput = { variantId: string; quantity?: number; attributes?: LineAttribute[] }
 
+type DiscountCode = { code: string; applicable: boolean }
+
+/** One discount allocation on the cart or on a line (code or automatic). */
+type CartDiscount = {
+  type: "code" | "automatic"
+  /** The discount code, or the automatic discount's title for display. */
+  code: string
+  title: string
+  amount: Money
+}
+
+type CartLineCost = {
+  amountPerQuantity: Money
+  compareAtAmountPerQuantity: Money | null
+  subtotalAmount: Money
+  totalAmount: Money
+}
+
 type CartLine = {
   id: string
   quantity: number
   variantId: string
+  sku: string | null
+  availableForSale: boolean
+  productId: string
   title: string
+  handle: string
+  vendor: string
+  productType: string
   variantTitle: string
+  selectedOptions: SelectedOption[]
   image: Image | null
   price: Money
+  compareAtPrice: Money | null
+  /** Server-computed line amounts, including line-level discounts. */
+  cost: CartLineCost
+  discounts: CartDiscount[]
   attributes: LineAttribute[]
   /** The bundle a line was added with, from its `_bundle` attribute. */
   bundle: string | null
@@ -40,18 +182,19 @@ type CartLine = {
   priceChangedFrom: string | null
 }
 
-type DiscountCode = { code: string; applicable: boolean }
-
-/** What one code took off: the cart reports codes and allocations separately. */
-type CartDiscount = { code: string; amount: Money }
-
 type Cart = {
   id: string
   checkoutUrl: string
   totalQuantity: number
+  note: string | null
+  attributes: LineAttribute[]
+  buyerIdentity: { countryCode: string | null }
   subtotal: Money
+  subtotalEstimated: boolean
   total: Money
+  totalEstimated: boolean
   tax: Money
+  taxEstimated: boolean
   discounts: CartDiscount[]
   discountCodes: DiscountCode[]
   lines: CartLine[]
@@ -70,12 +213,25 @@ type Status = "idle" | "loading" | "error"
 
 type ShopConfig = {
   endpoint: string
+  /** Optional Shopify public Storefront API access token (`X-Shopify-Storefront-Access-Token`). */
+  token?: string
   country: string
   language: string
   storageKey: string
   /** The most units a line may hold, from `<shop-cart max-quantity>`. */
   maxQuantity: number
   locale?: string
+  /** Optional extra headers sent with Storefront API requests. */
+  headers?: Record<string, string>
+}
+
+type RequestOptions = {
+  endpoint?: string
+  token?: string
+  country?: string
+  language?: string
+  headers?: Record<string, string>
+  signal?: AbortSignal
 }
 
 const config: ShopConfig = {
@@ -86,16 +242,35 @@ const config: ShopConfig = {
   maxQuantity: 10,
 }
 
+const configListeners = new Set<(config: Readonly<ShopConfig>) => void>()
+
+function subscribeConfig(listener: (config: Readonly<ShopConfig>) => void) {
+  configListeners.add(listener)
+  return () => {
+    configListeners.delete(listener)
+  }
+}
+
 function configureShop(next: Partial<ShopConfig>) {
-  const storageChanged =
-    next.storageKey !== undefined && next.storageKey !== config.storageKey
+  const storageChanged = next.storageKey !== undefined && next.storageKey !== config.storageKey
+  const contextChanged =
+    (next.country !== undefined && next.country.toUpperCase() !== config.country.toUpperCase()) ||
+    (next.language !== undefined && next.language.toUpperCase() !== config.language.toUpperCase())
+  const endpointChanged = next.endpoint !== undefined && next.endpoint !== config.endpoint
   Object.assign(config, next)
-  if (storageChanged) {
+  for (const listener of configListeners) listener({ ...config })
+  if (storageChanged || endpointChanged) {
     storedKey = ""
     id = null
-    // The keys arrive after the first read: look again under the new one.
     if (started) void ensureCart()
+  } else if (contextChanged && started && id) {
+    // Market changed: update the live cart's buyerIdentity so cart currency follows.
+    void updateBuyerIdentity({ countryCode: config.country.toUpperCase() }).catch(() => {})
   }
+}
+
+function shopConfig(): Readonly<ShopConfig> {
+  return { ...config }
 }
 
 /** The most units a line may hold. */
@@ -106,6 +281,13 @@ function quantityLimit() {
 function clampQuantity(quantity: number) {
   const whole = Math.round(Number(quantity) || 1)
   return Math.min(quantityLimit(), Math.max(1, whole))
+}
+
+function contextVars(override?: { country?: string; language?: string }) {
+  return {
+    country: (override?.country ?? config.country).toUpperCase(),
+    language: (override?.language ?? config.language).toUpperCase(),
+  }
 }
 
 // ---------------------------------------------------------------- formatting
@@ -126,21 +308,71 @@ function money(value: Money | null | undefined) {
   return formatter.format(Number(value.amount))
 }
 
+/**
+ * Builds a Shopify Shop Pay accelerated checkout URL for one or more lines,
+ * using Shopify's native cart permalink format (`https://{host}/cart/{id}:{qty}?payment=shop_pay`),
+ * or appends Shop Pay to an active cart's checkout URL when no lines are passed.
+ */
+function shopPayUrl(
+  input: LineInput[] | { checkoutUrl: string } | null | undefined,
+  endpoint = config.endpoint,
+): string | null {
+  if (!input) return null
+  if (!Array.isArray(input)) {
+    try {
+      const url = new URL(input.checkoutUrl)
+      url.searchParams.set("payment", "shop_pay")
+      return url.toString()
+    } catch {
+      return input.checkoutUrl || null
+    }
+  }
+  if (!input.length) return null
+  const segments: string[] = []
+  for (const line of input) {
+    const numeric = numericGid(line.variantId)
+    if (!numeric) return null
+    segments.push(`${numeric}:${clampQuantity(line.quantity ?? 1)}`)
+  }
+  try {
+    const origin = new URL(endpoint).origin
+    return `${origin}/cart/${segments.join(",")}?payment=shop_pay`
+  } catch {
+    return null
+  }
+}
 
 // ---------------------------------------------------------------- storefront
 
-type GraphQLBody<T> = { data?: T; errors?: { message: string }[] }
+type GraphQLErrorItem = {
+  message: string
+  path?: (string | number)[]
+  extensions?: Record<string, unknown>
+}
+type GraphQLBody<T> = { data?: T; errors?: GraphQLErrorItem[] }
 
 async function graphql<T>(
   query: string,
   variables: Record<string, unknown> = {},
-  endpoint = config.endpoint,
+  endpointOrOptions: string | RequestOptions = config.endpoint,
+  signal?: AbortSignal,
 ) {
+  const opts: RequestOptions =
+    typeof endpointOrOptions === "string" ? { endpoint: endpointOrOptions } : endpointOrOptions
+  const endpoint = opts.endpoint ?? config.endpoint
+  const token = opts.token ?? config.token
+  const headers: Record<string, string> = {
+    "content-type": "application/json",
+    ...(config.headers ?? {}),
+    ...(opts.headers ?? {}),
+  }
+  if (token) headers["X-Shopify-Storefront-Access-Token"] = token
+
   const response = await fetch(endpoint, {
     method: "POST",
-    headers: { "content-type": "application/json" },
+    headers,
     body: JSON.stringify({ query, variables }),
-    signal: AbortSignal.timeout(12_000),
+    signal: opts.signal ?? signal ?? AbortSignal.timeout(12_000),
   })
   if (!response.ok) throw new Error(`Storefront returned HTTP ${response.status}`)
   const body = (await response.json()) as GraphQLBody<T>
@@ -149,80 +381,437 @@ async function graphql<T>(
   return body.data
 }
 
+const imageFields = `id url altText width height`
+
+const variantFields = `
+  id
+  title
+  sku
+  availableForSale
+  currentlyNotInStock
+  selectedOptions { name value }
+  price { amount currencyCode }
+  compareAtPrice { amount currencyCode }
+  unitPrice { amount currencyCode }
+  image { ${imageFields} }
+`
+
+const optionFields = `
+  id
+  name
+  values
+  optionValues {
+    id
+    name
+    swatch {
+      color
+      image { previewImage { ${imageFields} } }
+    }
+  }
+`
+
+const productCardFields = `
+  id
+  handle
+  title
+  vendor
+  productType
+  tags
+  availableForSale
+  description
+  featuredImage { ${imageFields} }
+  priceRange {
+    minVariantPrice { amount currencyCode }
+    maxVariantPrice { amount currencyCode }
+  }
+  compareAtPriceRange {
+    minVariantPrice { amount currencyCode }
+    maxVariantPrice { amount currencyCode }
+  }
+  options { ${optionFields} }
+  variants(first: 25) {
+    nodes { ${variantFields} }
+  }
+`
+
+type RawProductCard = Omit<
+  ProductCardData,
+  "price" | "maxPrice" | "priceVaries" | "compareAtPrice" | "variants" | "options"
+> & {
+  priceRange: PriceRange
+  compareAtPriceRange: PriceRange
+  options?: ProductOption[]
+  variants?: { nodes: Variant[] }
+}
+
+function normalizeProductCard(raw: RawProductCard): ProductCardData {
+  const min = raw.priceRange.minVariantPrice
+  const max = raw.priceRange.maxVariantPrice
+  const compare = raw.compareAtPriceRange.maxVariantPrice
+  return {
+    id: raw.id,
+    handle: raw.handle,
+    title: raw.title,
+    vendor: raw.vendor,
+    productType: raw.productType ?? "",
+    tags: raw.tags ?? [],
+    availableForSale: raw.availableForSale,
+    description: raw.description ?? "",
+    featuredImage: raw.featuredImage ?? null,
+    price: min,
+    maxPrice: max,
+    priceVaries: Number(max.amount) > Number(min.amount),
+    compareAtPrice:
+      compare &&
+      compare.currencyCode === min.currencyCode &&
+      Number(compare.amount) > Number(min.amount)
+        ? compare
+        : null,
+    options: raw.options ?? [],
+    variants: raw.variants?.nodes ?? [],
+  }
+}
+
 const productQuery = `query Product($handle: String!, $country: CountryCode, $language: LanguageCode)
   @inContext(country: $country, language: $language) {
     product(handle: $handle) {
+      id
       title
       handle
       vendor
+      productType
+      tags
+      availableForSale
+      description
       descriptionHtml
-      options { name values optionValues { name swatch { color } } }
-      featuredImage { url altText width height }
-      images(first: 20) { nodes { url altText width height } }
-      variants(first: 50) {
-        nodes {
-          id
-          title
-          availableForSale
-          selectedOptions { name value }
-          price { amount currencyCode }
-          compareAtPrice { amount currencyCode }
-          image { url altText width height }
-        }
+      seo { title description }
+      priceRange {
+        minVariantPrice { amount currencyCode }
+        maxVariantPrice { amount currencyCode }
+      }
+      compareAtPriceRange {
+        minVariantPrice { amount currencyCode }
+        maxVariantPrice { amount currencyCode }
+      }
+      options { ${optionFields} }
+      featuredImage { ${imageFields} }
+      images(first: 50) { nodes { ${imageFields} } }
+      variants(first: 250) {
+        nodes { ${variantFields} }
       }
     }
   }`
 
-type RawProduct = Product & {
+type RawProduct = Omit<Product, "images" | "variants"> & {
   images: { nodes: Image[] }
   variants: { nodes: Variant[] }
 }
 
 /** One product by handle, from the configured store or the endpoint given. */
-async function fetchProduct(handle: string, endpoint = config.endpoint) {
+async function fetchProduct(
+  handle: string,
+  endpointOrOptions: string | RequestOptions = config.endpoint,
+  signal?: AbortSignal,
+): Promise<Product> {
+  const opts = typeof endpointOrOptions === "string" ? { endpoint: endpointOrOptions } : endpointOrOptions
   const data = await graphql<{ product: RawProduct | null }>(
     productQuery,
-    {
-      handle,
-      country: config.country.toUpperCase(),
-      language: config.language.toUpperCase(),
-    },
-    endpoint,
+    { handle, ...contextVars(opts) },
+    opts,
+    signal,
   )
   if (!data.product) throw new Error(`No product with handle "${handle}"`)
   const raw = data.product
   return {
     ...raw,
+    productType: raw.productType ?? "",
+    tags: raw.tags ?? [],
+    description: raw.description ?? "",
+    seo: raw.seo ?? { title: null, description: null },
+    featuredImage: raw.featuredImage ?? null,
     images: raw.images.nodes,
     variants: raw.variants.nodes,
-  } satisfies Product
+  }
+}
+
+/** Shop identity & primary domain. */
+async function fetchShop(
+  endpointOrOptions: string | RequestOptions = config.endpoint,
+  signal?: AbortSignal,
+): Promise<ShopInfo> {
+  const opts = typeof endpointOrOptions === "string" ? { endpoint: endpointOrOptions } : endpointOrOptions
+  const data = await graphql<{ shop: ShopInfo }>(
+    `query Shop($country: CountryCode, $language: LanguageCode) @inContext(country: $country, language: $language) {
+      shop { name description primaryDomain { url host } }
+    }`,
+    contextVars(opts),
+    opts,
+    signal,
+  )
+  return data.shop
+}
+
+/** Markets, countries, currencies, and languages supported by the store. */
+async function fetchLocalization(
+  endpointOrOptions: string | RequestOptions = config.endpoint,
+  signal?: AbortSignal,
+): Promise<Localization> {
+  const opts = typeof endpointOrOptions === "string" ? { endpoint: endpointOrOptions } : endpointOrOptions
+  const data = await graphql<{ localization: Localization }>(
+    `query Localization($country: CountryCode, $language: LanguageCode) @inContext(country: $country, language: $language) {
+      localization {
+        country { isoCode name currency { isoCode symbol } }
+        language { isoCode endonymName }
+        availableCountries {
+          isoCode
+          name
+          currency { isoCode symbol }
+          availableLanguages { isoCode endonymName }
+        }
+      }
+    }`,
+    contextVars(opts),
+    opts,
+    signal,
+  )
+  return data.localization
+}
+
+/** Lists collections from the store. */
+async function fetchCollections(
+  options: RequestOptions & { first?: number } = {},
+  signal?: AbortSignal,
+): Promise<CollectionSummary[]> {
+  const data = await graphql<{ collections: { nodes: CollectionSummary[] } }>(
+    `query Collections($first: Int!, $country: CountryCode, $language: LanguageCode)
+      @inContext(country: $country, language: $language) {
+      collections(first: $first) {
+        nodes {
+          id handle title description descriptionHtml
+          image { ${imageFields} }
+        }
+      }
+    }`,
+    { first: options.first ?? 24, ...contextVars(options) },
+    options,
+    signal,
+  )
+  return data.collections.nodes
+}
+
+/** Fetches one collection with paginated products and merchant-configured Storefront filters. */
+async function fetchCollection(
+  handle: string,
+  options: RequestOptions & {
+    first?: number
+    after?: string | null
+    sortKey?: "BEST_SELLING" | "CREATED" | "PRICE" | "TITLE" | "MANUAL" | "COLLECTION_DEFAULT"
+    reverse?: boolean
+    filters?: Record<string, unknown>[]
+  } = {},
+  signal?: AbortSignal,
+): Promise<CollectionPage> {
+  const data = await graphql<{
+    collection: (CollectionSummary & {
+      products: {
+        pageInfo: { hasNextPage: boolean; endCursor: string | null }
+        filters: CollectionFilter[]
+        nodes: RawProductCard[]
+      }
+    }) | null
+  }>(
+    `query Collection(
+      $handle: String!,
+      $first: Int!,
+      $after: String,
+      $sortKey: ProductCollectionSortKeys,
+      $reverse: Boolean,
+      $filters: [ProductFilter!],
+      $country: CountryCode,
+      $language: LanguageCode
+    ) @inContext(country: $country, language: $language) {
+      collection(handle: $handle) {
+        id handle title description descriptionHtml
+        image { ${imageFields} }
+        products(first: $first, after: $after, sortKey: $sortKey, reverse: $reverse, filters: $filters) {
+          pageInfo { hasNextPage endCursor }
+          filters { id label type values { id label count input } }
+          nodes { ${productCardFields} }
+        }
+      }
+    }`,
+    {
+      handle,
+      first: options.first ?? 24,
+      after: options.after ?? null,
+      sortKey: options.sortKey ?? "COLLECTION_DEFAULT",
+      reverse: options.reverse ?? false,
+      filters: options.filters ?? [],
+      ...contextVars(options),
+    },
+    options,
+    signal,
+  )
+  if (!data.collection) throw new Error(`No collection with handle "${handle}"`)
+  const { products, ...collection } = data.collection
+  return {
+    collection,
+    products: products.nodes.map(normalizeProductCard),
+    filters: products.filters ?? [],
+    cursor: products.pageInfo.endCursor,
+    hasNext: products.pageInfo.hasNextPage,
+  }
+}
+
+/** Shopify's native ML-powered product recommendations (`RELATED` or `COMPLEMENTARY`). */
+async function fetchProductRecommendations(
+  productId: string,
+  options: RequestOptions & { intent?: "RELATED" | "COMPLEMENTARY" } = {},
+  signal?: AbortSignal,
+): Promise<ProductCardData[]> {
+  const data = await graphql<{ productRecommendations: RawProductCard[] | null }>(
+    `query Recommendations(
+      $productId: ID!,
+      $intent: ProductRecommendationIntent,
+      $country: CountryCode,
+      $language: LanguageCode
+    ) @inContext(country: $country, language: $language) {
+      productRecommendations(productId: $productId, intent: $intent) {
+        ${productCardFields}
+      }
+    }`,
+    {
+      productId,
+      intent: options.intent ?? "RELATED",
+      ...contextVars(options),
+    },
+    options,
+    signal,
+  )
+  return (data.productRecommendations ?? []).map(normalizeProductCard)
+}
+
+/** Shopify's instant predictive search (query suggestions, products, collections). */
+async function fetchPredictiveSearch(
+  query: string,
+  options: RequestOptions & { limit?: number } = {},
+  signal?: AbortSignal,
+): Promise<PredictiveSearchResult> {
+  const trimmed = query.trim()
+  if (!trimmed) return { queries: [], products: [], collections: [] }
+  const data = await graphql<{
+    predictiveSearch: {
+      queries: PredictiveSearchQuery[]
+      products: RawProductCard[]
+      collections: CollectionSummary[]
+    } | null
+  }>(
+    `query PredictiveSearch(
+      $query: String!,
+      $limit: Int,
+      $country: CountryCode,
+      $language: LanguageCode
+    ) @inContext(country: $country, language: $language) {
+      predictiveSearch(query: $query, limit: $limit) {
+        queries { text styledText }
+        products { ${productCardFields} }
+        collections {
+          id handle title description descriptionHtml
+          image { ${imageFields} }
+        }
+      }
+    }`,
+    {
+      query: trimmed,
+      limit: options.limit ?? 6,
+      ...contextVars(options),
+    },
+    options,
+    signal,
+  )
+  const result = data.predictiveSearch
+  return {
+    queries: result?.queries ?? [],
+    products: (result?.products ?? []).map(normalizeProductCard),
+    collections: result?.collections ?? [],
+  }
+}
+
+/** Fetches a Shopify navigation menu by handle (e.g. `main-menu`, `footer`). */
+async function fetchMenu(
+  handle: string,
+  endpointOrOptions: string | RequestOptions = config.endpoint,
+  signal?: AbortSignal,
+): Promise<ShopMenu | null> {
+  const opts = typeof endpointOrOptions === "string" ? { endpoint: endpointOrOptions } : endpointOrOptions
+  const data = await graphql<{ menu: ShopMenu | null }>(
+    `query Menu($handle: String!, $country: CountryCode, $language: LanguageCode)
+      @inContext(country: $country, language: $language) {
+      menu(handle: $handle) {
+        id handle title
+        items {
+          id title url type
+          items {
+            id title url type
+            items { id title url type }
+          }
+        }
+      }
+    }`,
+    { handle, ...contextVars(opts) },
+    opts,
+    signal,
+  )
+  return data.menu
 }
 
 // ------------------------------------------------------------------ cart API
+
+const discountAllocationFields = `
+  discountedAmount { amount currencyCode }
+  ... on CartCodeDiscountAllocation { code }
+  ... on CartAutomaticDiscountAllocation { title }
+`
 
 const cartFields = `fragment CartFields on Cart {
   id
   checkoutUrl
   totalQuantity
+  note
+  attributes { key value }
+  buyerIdentity { countryCode }
   discountCodes { code applicable }
-  discountAllocations { discountedAmount { amount currencyCode } }
+  discountAllocations { ${discountAllocationFields} }
   cost {
     subtotalAmount { amount currencyCode }
+    subtotalAmountEstimated
     totalAmount { amount currencyCode }
+    totalAmountEstimated
     totalTaxAmount { amount currencyCode }
+    totalTaxAmountEstimated
   }
-  lines(first: 50) {
+  lines(first: 100) {
     nodes {
       id
       quantity
       attributes { key value }
+      cost {
+        amountPerQuantity { amount currencyCode }
+        compareAtAmountPerQuantity { amount currencyCode }
+        subtotalAmount { amount currencyCode }
+        totalAmount { amount currencyCode }
+      }
+      discountAllocations { ${discountAllocationFields} }
       merchandise {
         ... on ProductVariant {
           id
           title
+          sku
+          availableForSale
           price { amount currencyCode }
-          image { url altText width height }
-          product { title handle }
+          compareAtPrice { amount currencyCode }
+          image { ${imageFields} }
+          product { id title handle vendor productType }
           selectedOptions { name value }
         }
       }
@@ -230,41 +819,82 @@ const cartFields = `fragment CartFields on Cart {
   }
 }`
 
+type RawDiscountAllocation = {
+  discountedAmount: Money
+  code?: string
+  title?: string
+}
+
 type RawCart = {
   id: string
   checkoutUrl: string
   totalQuantity: number
+  note?: string | null
+  attributes?: LineAttribute[] | null
+  buyerIdentity?: { countryCode?: string | null } | null
   discountCodes: DiscountCode[] | null
-  discountAllocations: { discountedAmount: Money }[] | null
+  discountAllocations: RawDiscountAllocation[] | null
   cost: {
     subtotalAmount: Money
+    subtotalAmountEstimated?: boolean
     totalAmount: Money
+    totalAmountEstimated?: boolean
     totalTaxAmount: Money | null
+    totalTaxAmountEstimated?: boolean
   }
   lines: {
     nodes: {
       id: string
       quantity: number
       attributes?: LineAttribute[] | null
+      cost?: {
+        amountPerQuantity: Money
+        compareAtAmountPerQuantity?: Money | null
+        subtotalAmount: Money
+        totalAmount: Money
+      } | null
+      discountAllocations?: RawDiscountAllocation[] | null
       merchandise: {
         id: string
         title: string
+        sku?: string | null
+        availableForSale?: boolean
         price: Money
+        compareAtPrice?: Money | null
         image: Image | null
-        product: { title: string; handle: string }
+        selectedOptions?: SelectedOption[] | null
+        product: {
+          id?: string
+          title: string
+          handle: string
+          vendor?: string
+          productType?: string
+        }
       } | null
     }[]
   }
 }
 
-// The API does not say which allocation belongs to which code: pair them in order.
-function pairDiscounts(raw: RawCart): CartDiscount[] {
-  const codes = raw.discountCodes ?? []
-  const allocations = raw.discountAllocations ?? []
+function normalizeDiscounts(raw: RawDiscountAllocation[] | null | undefined): CartDiscount[] {
   const discounts: CartDiscount[] = []
-  for (const [index, entry] of codes.entries()) {
-    const amount = allocations[index]?.discountedAmount
-    if (amount && Number(amount.amount) > 0) discounts.push({ code: entry.code, amount })
+  for (const entry of raw ?? []) {
+    if (!entry.discountedAmount || Number(entry.discountedAmount.amount) <= 0) continue
+    if (entry.code) {
+      discounts.push({
+        type: "code",
+        code: entry.code,
+        title: entry.code,
+        amount: entry.discountedAmount,
+      })
+    } else {
+      const label = entry.title ?? "Discount"
+      discounts.push({
+        type: "automatic",
+        code: label,
+        title: label,
+        amount: entry.discountedAmount,
+      })
+    }
   }
   return discounts
 }
@@ -273,15 +903,37 @@ function normalizeCart(raw: RawCart): Cart {
   const lines: CartLine[] = []
   for (const node of raw.lines.nodes) {
     if (!node.merchandise) continue
+    const unitPrice = node.cost?.amountPerQuantity ?? node.merchandise.price
+    const fallbackTotal: Money = {
+      amount: (Number(unitPrice.amount) * node.quantity).toFixed(2),
+      currencyCode: unitPrice.currencyCode,
+    }
     lines.push({
       id: node.id,
       quantity: node.quantity,
       variantId: node.merchandise.id,
+      sku: node.merchandise.sku ?? null,
+      availableForSale: node.merchandise.availableForSale ?? true,
+      productId: node.merchandise.product.id ?? "",
       title: node.merchandise.product.title,
+      handle: node.merchandise.product.handle,
+      vendor: node.merchandise.product.vendor ?? "",
+      productType: node.merchandise.product.productType ?? "",
       variantTitle:
-        node.merchandise.title === "Default Title" ? "" : node.merchandise.title,
+        node.merchandise.title === "Default Title" || node.merchandise.title === "Default"
+          ? ""
+          : node.merchandise.title,
+      selectedOptions: node.merchandise.selectedOptions ?? [],
       image: node.merchandise.image,
       price: node.merchandise.price,
+      compareAtPrice: node.merchandise.compareAtPrice ?? null,
+      cost: {
+        amountPerQuantity: unitPrice,
+        compareAtAmountPerQuantity: node.cost?.compareAtAmountPerQuantity ?? node.merchandise.compareAtPrice ?? null,
+        subtotalAmount: node.cost?.subtotalAmount ?? fallbackTotal,
+        totalAmount: node.cost?.totalAmount ?? fallbackTotal,
+      },
+      discounts: normalizeDiscounts(node.discountAllocations),
       attributes: node.attributes ?? [],
       bundle: node.attributes?.find((entry) => entry.key === "_bundle")?.value ?? null,
       priceChangedFrom: null,
@@ -291,13 +943,19 @@ function normalizeCart(raw: RawCart): Cart {
     id: raw.id,
     checkoutUrl: raw.checkoutUrl,
     totalQuantity: raw.totalQuantity,
+    note: raw.note ?? null,
+    attributes: raw.attributes ?? [],
+    buyerIdentity: { countryCode: raw.buyerIdentity?.countryCode ?? null },
     subtotal: raw.cost.subtotalAmount,
+    subtotalEstimated: Boolean(raw.cost.subtotalAmountEstimated),
     total: raw.cost.totalAmount,
+    totalEstimated: Boolean(raw.cost.totalAmountEstimated),
     tax: raw.cost.totalTaxAmount ?? {
       amount: "0",
       currencyCode: raw.cost.totalAmount.currencyCode,
     },
-    discounts: pairDiscounts(raw),
+    taxEstimated: Boolean(raw.cost.totalTaxAmountEstimated),
+    discounts: normalizeDiscounts(raw.discountAllocations),
     discountCodes: raw.discountCodes ?? [],
     lines,
   }
@@ -341,9 +999,7 @@ function emit() {
   for (const listener of listeners) listener(cart, status, lastError)
 }
 
-function subscribeCart(
-  listener: (cart: Cart | null, status: Status, error?: Error) => void,
-) {
+function subscribeCart(listener: (cart: Cart | null, status: Status, error?: Error) => void) {
   listeners.add(listener)
   listener(cart, status, lastError)
   return () => {
@@ -449,7 +1105,6 @@ function startStorageSync() {
   storageBound = true
   window.addEventListener("storage", (event) => {
     if (event.key !== config.storageKey) return
-    // Another tab chose another cart, or dropped this one: read it again.
     storedKey = ""
     void ensureCart()
   })
@@ -499,8 +1154,11 @@ function ensureCart() {
 
 async function fetchCart(cartId: string) {
   const data = await graphql<{ cart: RawCart | null }>(
-    `query Cart($id: ID!) { cart(id: $id) { ...CartFields } } ${cartFields}`,
-    { id: cartId },
+    `query Cart($id: ID!, $country: CountryCode, $language: LanguageCode)
+      @inContext(country: $country, language: $language) {
+      cart(id: $id) { ...CartFields }
+    } ${cartFields}`,
+    { id: cartId, ...contextVars() },
   )
   if (!data.cart) throw new Error("Cart not found")
   return normalizeCart(data.cart)
@@ -515,16 +1173,18 @@ const cartLineInputs = (lines: LineInput[]) =>
 
 async function createCart(input: LineInput[] = []) {
   const lines = cartLineInputs(input)
+  const ctx = contextVars()
   const data = await graphql<{
     cartCreate: { cart: RawCart; userErrors: { message: string }[] }
   }>(
-    `mutation CreateCart($lines: [CartLineInput!]) {
-      cartCreate(input: { lines: $lines }) {
+    `mutation CreateCart($lines: [CartLineInput!], $country: CountryCode, $language: LanguageCode)
+      @inContext(country: $country, language: $language) {
+      cartCreate(input: { lines: $lines, buyerIdentity: { countryCode: $country } }) {
         cart { ...CartFields }
         userErrors { message }
       }
     } ${cartFields}`,
-    { lines },
+    { lines, ...ctx },
   )
   const error = data.cartCreate.userErrors[0]
   if (error) throw new Error(error.message)
@@ -543,13 +1203,14 @@ async function addLines(input: LineInput[]) {
     const data = await graphql<{
       cartLinesAdd: { cart: RawCart; userErrors: { message: string }[] }
     }>(
-      `mutation AddLines($cartId: ID!, $lines: [CartLineInput!]!) {
+      `mutation AddLines($cartId: ID!, $lines: [CartLineInput!]!, $country: CountryCode, $language: LanguageCode)
+        @inContext(country: $country, language: $language) {
         cartLinesAdd(cartId: $cartId, lines: $lines) {
           cart { ...CartFields }
           userErrors { message }
         }
       } ${cartFields}`,
-      { cartId: id, lines: cartLineInputs(input) },
+      { cartId: id, lines: cartLineInputs(input), ...contextVars() },
     )
     const error = data.cartLinesAdd.userErrors[0]
     if (error) throw new Error(error.message)
@@ -579,13 +1240,14 @@ async function setLineQuantity(lineId: string, quantity: number) {
     const data = await graphql<{
       cartLinesUpdate: { cart: RawCart; userErrors: { message: string }[] }
     }>(
-      `mutation UpdateLines($cartId: ID!, $lines: [CartLineUpdateInput!]!) {
+      `mutation UpdateLines($cartId: ID!, $lines: [CartLineUpdateInput!]!, $country: CountryCode, $language: LanguageCode)
+        @inContext(country: $country, language: $language) {
         cartLinesUpdate(cartId: $cartId, lines: $lines) {
           cart { ...CartFields }
           userErrors { message }
         }
       } ${cartFields}`,
-      { cartId: id, lines: [{ id: lineId, quantity: amount }] },
+      { cartId: id, lines: [{ id: lineId, quantity: amount }], ...contextVars() },
     )
     const error = data.cartLinesUpdate.userErrors[0]
     if (error) throw new Error(error.message)
@@ -595,31 +1257,32 @@ async function setLineQuantity(lineId: string, quantity: number) {
   }
 }
 
-async function removeLine(lineId: string) {
+async function removeLines(lineIds: string[]) {
   syncStorage()
-  const going = cart?.lines.find((line) => line.id === lineId)
-  const snapshot: RemovedLine | undefined = going && {
-    variantId: going.variantId,
-    quantity: going.quantity,
-    attributes: going.attributes,
-    title: going.title,
-    variantTitle: going.variantTitle,
+  if (!id || !lineIds.length) return cart
+  const single = lineIds.length === 1 ? cart?.lines.find((line) => line.id === lineIds[0]) : undefined
+  const snapshot: RemovedLine | undefined = single && {
+    variantId: single.variantId,
+    quantity: single.quantity,
+    attributes: single.attributes,
+    title: single.title,
+    variantTitle: single.variantTitle,
   }
   clearUndo()
-  if (!id) return cart
   status = "loading"
   emit()
   try {
     const data = await graphql<{
       cartLinesRemove: { cart: RawCart; userErrors: { message: string }[] }
     }>(
-      `mutation RemoveLines($cartId: ID!, $lineIds: [ID!]!) {
+      `mutation RemoveLines($cartId: ID!, $lineIds: [ID!]!, $country: CountryCode, $language: LanguageCode)
+        @inContext(country: $country, language: $language) {
         cartLinesRemove(cartId: $cartId, lineIds: $lineIds) {
           cart { ...CartFields }
           userErrors { message }
         }
       } ${cartFields}`,
-      { cartId: id, lineIds: [lineId] },
+      { cartId: id, lineIds, ...contextVars() },
     )
     const error = data.cartLinesRemove.userErrors[0]
     if (error) throw new Error(error.message)
@@ -631,13 +1294,13 @@ async function removeLine(lineId: string) {
   }
 }
 
-/** Adds a code to the ones already on the cart: the API takes the full list. */
-async function applyDiscount(code: string) {
+function removeLine(lineId: string) {
+  return removeLines([lineId])
+}
+
+async function updateDiscountCodes(codes: string[]) {
   syncStorage()
   if (!id) throw new Error("The cart has not started yet")
-  const codes = (cart?.discountCodes ?? []).map((entry) => entry.code)
-  const known = codes.some((entry) => entry.toUpperCase() === code.toUpperCase())
-  if (!known) codes.push(code)
   clearUndo()
   status = "loading"
   emit()
@@ -645,17 +1308,115 @@ async function applyDiscount(code: string) {
     const data = await graphql<{
       cartDiscountCodesUpdate: { cart: RawCart; userErrors: { message: string }[] }
     }>(
-      `mutation ApplyDiscount($cartId: ID!, $codes: [String!]!) {
+      `mutation UpdateDiscounts($cartId: ID!, $codes: [String!]!, $country: CountryCode, $language: LanguageCode)
+        @inContext(country: $country, language: $language) {
         cartDiscountCodesUpdate(cartId: $cartId, discountCodes: $codes) {
           cart { ...CartFields }
           userErrors { message }
         }
       } ${cartFields}`,
-      { cartId: id, codes },
+      { cartId: id, codes, ...contextVars() },
     )
     const error = data.cartDiscountCodesUpdate.userErrors[0]
     if (error) throw new Error(error.message)
     return adopt(normalizeCart(data.cartDiscountCodesUpdate.cart))
+  } catch (error) {
+    return fail(error)
+  }
+}
+
+/** Adds a code to the ones already on the cart: the API takes the full list. */
+async function applyDiscount(code: string) {
+  const codes = (cart?.discountCodes ?? []).map((entry) => entry.code)
+  const known = codes.some((entry) => entry.toUpperCase() === code.toUpperCase())
+  if (!known) codes.push(code)
+  return updateDiscountCodes(codes)
+}
+
+/** Removes a discount code from the cart. */
+async function removeDiscount(code: string) {
+  const codes = (cart?.discountCodes ?? [])
+    .map((entry) => entry.code)
+    .filter((entry) => entry.toUpperCase() !== code.toUpperCase())
+  return updateDiscountCodes(codes)
+}
+
+/** Sets or clears the cart note (gift message, delivery instructions). */
+async function updateCartNote(note: string) {
+  syncStorage()
+  if (!id) throw new Error("The cart has not started yet")
+  status = "loading"
+  emit()
+  try {
+    const data = await graphql<{
+      cartNoteUpdate: { cart: RawCart; userErrors: { message: string }[] }
+    }>(
+      `mutation UpdateNote($cartId: ID!, $note: String!, $country: CountryCode, $language: LanguageCode)
+        @inContext(country: $country, language: $language) {
+        cartNoteUpdate(cartId: $cartId, note: $note) {
+          cart { ...CartFields }
+          userErrors { message }
+        }
+      } ${cartFields}`,
+      { cartId: id, note, ...contextVars() },
+    )
+    const error = data.cartNoteUpdate.userErrors[0]
+    if (error) throw new Error(error.message)
+    return adopt(normalizeCart(data.cartNoteUpdate.cart))
+  } catch (error) {
+    return fail(error)
+  }
+}
+
+/** Updates cart-level custom attributes. */
+async function updateCartAttributes(attributes: LineAttribute[]) {
+  syncStorage()
+  if (!id) throw new Error("The cart has not started yet")
+  status = "loading"
+  emit()
+  try {
+    const data = await graphql<{
+      cartAttributesUpdate: { cart: RawCart; userErrors: { message: string }[] }
+    }>(
+      `mutation UpdateAttributes($cartId: ID!, $attributes: [AttributeInput!]!, $country: CountryCode, $language: LanguageCode)
+        @inContext(country: $country, language: $language) {
+        cartAttributesUpdate(cartId: $cartId, attributes: $attributes) {
+          cart { ...CartFields }
+          userErrors { message }
+        }
+      } ${cartFields}`,
+      { cartId: id, attributes, ...contextVars() },
+    )
+    const error = data.cartAttributesUpdate.userErrors[0]
+    if (error) throw new Error(error.message)
+    return adopt(normalizeCart(data.cartAttributesUpdate.cart))
+  } catch (error) {
+    return fail(error)
+  }
+}
+
+/** Updates the cart's buyer identity (e.g., switching market/country currency). */
+async function updateBuyerIdentity(buyerIdentity: { countryCode?: string; email?: string; phone?: string }) {
+  syncStorage()
+  if (!id) return null
+  status = "loading"
+  emit()
+  try {
+    const data = await graphql<{
+      cartBuyerIdentityUpdate: { cart: RawCart; userErrors: { message: string }[] }
+    }>(
+      `mutation UpdateBuyerIdentity($cartId: ID!, $buyerIdentity: CartBuyerIdentityInput!, $country: CountryCode, $language: LanguageCode)
+        @inContext(country: $country, language: $language) {
+        cartBuyerIdentityUpdate(cartId: $cartId, buyerIdentity: $buyerIdentity) {
+          cart { ...CartFields }
+          userErrors { message }
+        }
+      } ${cartFields}`,
+      { cartId: id, buyerIdentity, ...contextVars() },
+    )
+    const error = data.cartBuyerIdentityUpdate.userErrors[0]
+    if (error) throw new Error(error.message)
+    return adopt(normalizeCart(data.cartBuyerIdentityUpdate.cart))
   } catch (error) {
     return fail(error)
   }
@@ -667,35 +1428,72 @@ const currentCart = () => ({ cart, status, error: lastError })
 export {
   addLine,
   addLines,
-  currentCart,
   announce,
   applyDiscount,
   cart,
   clearUndo,
   configureShop,
+  currentCart,
   ensureCart,
+  fetchCollection,
+  fetchCollections,
+  fetchLocalization,
+  fetchMenu,
+  fetchPredictiveSearch,
   fetchProduct,
+  fetchProductRecommendations,
+  fetchShop,
+  graphql,
   imageSrcSet,
   imageUrl,
   money,
+  normalizeProductCard,
+  productCardFields,
   quantityLimit,
+  removeDiscount,
   removeLine,
+  removeLines,
   setLineQuantity,
+  shopConfig,
+  shopPayUrl,
   status,
   subscribeAnnouncements,
   subscribeCart,
+  subscribeConfig,
   subscribeUndo,
+  updateBuyerIdentity,
+  updateCartAttributes,
+  updateCartNote,
   type Cart,
   type CartDiscount,
   type CartLine,
+  type CartLineCost,
+  type CollectionFilter,
+  type CollectionFilterValue,
+  type CollectionPage,
+  type CollectionSummary,
   type DiscountCode,
   type Image,
   type ImageTransform,
   type LineAttribute,
   type LineInput,
+  type Localization,
+  type MarketCountry,
+  type MarketCurrency,
+  type MarketLanguage,
+  type MenuItem,
   type Money,
+  type PredictiveSearchQuery,
+  type PredictiveSearchResult,
+  type PriceRange,
   type Product,
+  type ProductCardData,
+  type RawProductCard,
   type RemovedLine,
+  type RequestOptions,
+  type Seo,
   type ShopConfig,
+  type ShopInfo,
+  type ShopMenu,
   type Variant,
 }

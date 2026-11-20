@@ -1,0 +1,19 @@
+{
+  "name": "snowdevil-webcomponents",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "dev": "bun --hot ./index.ts",
+    "build": "bun build ./src/index.html --outdir ./dist --minify",
+    "typecheck": "tsc --noEmit -p ."
+  },
+  "dependencies": {
+    "@ui-sdk/core": "0.1.0-beta.5",
+    "@ui-sdk/web": "0.1.0-beta.5",
+    "shopify-storefront-ux-sdk": "file:../.."
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "typescript": "^5.9.3"
+  }
+}

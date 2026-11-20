@@ -1,0 +1,22 @@
+{
+  "name": "snowdevil-solid",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "dev": "bun --hot ./index.ts",
+    "build": "NODE_ENV=production bun ./build.ts",
+    "typecheck": "tsc --noEmit -p ."
+  },
+  "dependencies": {
+    "@solidjs/web": "2.0.3",
+    "@ui-sdk/core": "0.1.0-beta.5",
+    "@ui-sdk/solid": "0.1.0-beta.5",
+    "shopify-storefront-ux-sdk": "file:../..",
+    "solid-js": "2.0.3"
+  },
+  "devDependencies": {
+    "@solidjs/compiler": "2.0.2",
+    "@types/bun": "latest",
+    "typescript": "^5.9.3"
+  }
+}

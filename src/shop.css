@@ -528,36 +528,39 @@ shop-cart-status {
    The SDK carousel scrolls and snaps natively; slides are one to a view.
    Every image box keeps its shape before its pixels arrive. */
 
-shop-product-media {
+:is(shop-product-media, [data-slot="shop-product-media"]) {
   position: relative;
+  display: block;
   --shop-media-ratio: 4 / 5;
   --shop-media-surface: #edece8;
+  --shop-media-fit: cover;
 }
 
-shop-product-media .media-main {
+:is(shop-product-media, [data-slot="shop-product-media"]) .media-main {
   position: relative;
   display: block;
 }
 
-shop-product-media .media-viewport {
+:is(shop-product-media, [data-slot="shop-product-media"]) .media-viewport {
   border-radius: 10px;
+  overflow: hidden;
   scrollbar-width: none;
 }
 
-shop-product-media .media-viewport::-webkit-scrollbar {
+:is(shop-product-media, [data-slot="shop-product-media"]) .media-viewport::-webkit-scrollbar {
   display: none;
 }
 
-shop-product-media .media-track {
+:is(shop-product-media, [data-slot="shop-product-media"]) .media-track {
   display: flex;
 }
 
-shop-product-media .media-slide {
+:is(shop-product-media, [data-slot="shop-product-media"]) .media-slide {
   flex: 0 0 100%;
   min-width: 0;
 }
 
-shop-product-media .media-open {
+:is(shop-product-media, [data-slot="shop-product-media"]) .media-open {
   display: block;
   position: relative;
   width: 100%;
@@ -567,7 +570,7 @@ shop-product-media .media-open {
   cursor: zoom-in;
 }
 
-shop-product-media .media-frame {
+:is(shop-product-media, [data-slot="shop-product-media"]) .media-frame {
   position: relative;
   aspect-ratio: var(--shop-media-ratio);
   border-radius: 10px;
@@ -575,16 +578,16 @@ shop-product-media .media-frame {
   background: var(--shop-media-surface);
 }
 
-shop-product-media .media-image {
+:is(shop-product-media, [data-slot="shop-product-media"]) .media-image {
   display: block;
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  object-fit: var(--shop-media-fit);
   transform-origin: var(--shop-media-x, 50%) var(--shop-media-y, 50%);
   transition: transform 220ms ease;
 }
 
-shop-product-media .media-open:focus-visible {
+:is(shop-product-media, [data-slot="shop-product-media"]) .media-open:focus-visible {
   outline: none;
   box-shadow: var(--shop-focus-ring);
   border-radius: 12px;
@@ -592,17 +595,17 @@ shop-product-media .media-open:focus-visible {
 
 /* Zoom only for a fine pointer that can hover, and only when asked for. */
 @media (hover: hover) and (pointer: fine) {
-  shop-product-media[data-hover-zoom] .media-frame[data-zooming] .media-image {
+  :is(shop-product-media, [data-slot="shop-product-media"])[data-hover-zoom] .media-frame[data-zooming] .media-image {
     transform: scale(var(--shop-media-zoom, 2));
   }
 }
 
-shop-product-media:not([data-hover-zoom]) .media-hint-zoom {
+:is(shop-product-media, [data-slot="shop-product-media"]):not([data-hover-zoom]) .media-hint-zoom {
   display: none;
 }
 
 @media (hover: none), (pointer: coarse) {
-  shop-product-media .media-hint-zoom {
+  :is(shop-product-media, [data-slot="shop-product-media"]) .media-hint-zoom {
     display: none;
   }
 }
@@ -619,11 +622,11 @@ shop-product-media:not([data-hover-zoom]) .media-hint-zoom {
   transition: opacity 160ms ease;
 }
 
-shop-product-media .media-frame[data-zooming] + .media-hint {
+:is(shop-product-media, [data-slot="shop-product-media"]) .media-frame[data-zooming] + .media-hint {
   opacity: 0;
 }
 
-shop-product-media .media-step {
+:is(shop-product-media, [data-slot="shop-product-media"]) .media-step {
   position: absolute;
   top: calc(50% - 46px);
   display: grid;
@@ -640,38 +643,38 @@ shop-product-media .media-step {
   transition: opacity 160ms ease, background 160ms ease;
 }
 
-shop-product-media .media-previous {
+:is(shop-product-media, [data-slot="shop-product-media"]) .media-previous {
   left: 10px;
 }
 
-shop-product-media .media-next {
+:is(shop-product-media, [data-slot="shop-product-media"]) .media-next {
   right: 10px;
 }
 
-shop-product-media .media-step:hover {
+:is(shop-product-media, [data-slot="shop-product-media"]) .media-step:hover {
   background: #fff;
 }
 
-shop-product-media .media-step:focus-visible {
+:is(shop-product-media, [data-slot="shop-product-media"]) .media-step:focus-visible {
   outline: none;
   box-shadow: var(--shop-focus-ring);
 }
 
-shop-product-media[data-single] .media-step,
-shop-product-media[data-single] .thumbs,
-shop-product-media[data-single] .image-control:not(.image-close),
-shop-product-media[data-single] .image-filmstrip {
+:is(shop-product-media, [data-slot="shop-product-media"])[data-single] .media-step,
+:is(shop-product-media, [data-slot="shop-product-media"])[data-single] .thumbs,
+:is(shop-product-media, [data-slot="shop-product-media"])[data-single] .image-control:not(.image-close),
+:is(shop-product-media, [data-slot="shop-product-media"])[data-single] .image-filmstrip {
   display: none;
 }
 
-shop-product-media .thumbs {
+:is(shop-product-media, [data-slot="shop-product-media"]) .thumbs {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
   margin-top: 12px;
 }
 
-shop-product-media .thumb,
+:is(shop-product-media, [data-slot="shop-product-media"]) .thumb,
 .image-film-thumb {
   display: block;
   width: 54px;
@@ -685,28 +688,28 @@ shop-product-media .thumb,
   transition: opacity 150ms ease, border-color 150ms ease;
 }
 
-shop-product-media .thumb img,
+:is(shop-product-media, [data-slot="shop-product-media"]) .thumb img,
 .image-film-thumb img {
   display: block;
   width: 100%;
   height: 100%;
   border-radius: 4px;
-  object-fit: cover;
+  object-fit: var(--shop-media-fit, cover);
 }
 
-shop-product-media .thumb:hover,
+:is(shop-product-media, [data-slot="shop-product-media"]) .thumb:hover,
 .image-film-thumb:hover {
   opacity: 1;
 }
 
-shop-product-media .thumb[data-selected],
+:is(shop-product-media, [data-slot="shop-product-media"]) .thumb[data-selected],
 .image-film-thumb[data-selected] {
   border-color: currentColor;
   box-shadow: 0 0 0 1px currentColor;
   opacity: 1;
 }
 
-shop-product-media .thumb:focus-visible,
+:is(shop-product-media, [data-slot="shop-product-media"]) .thumb:focus-visible,
 .image-film-thumb:focus-visible {
   outline: none;
   box-shadow: var(--shop-focus-ring);
@@ -718,6 +721,7 @@ shop-product-media .thumb:focus-visible,
 .image-backdrop {
   position: fixed;
   inset: 0;
+  z-index: 60;
   width: 100vw;
   height: 100dvh;
   max-width: none;
@@ -735,9 +739,10 @@ shop-product-media .thumb:focus-visible,
   opacity: 0;
 }
 
-ui-dialog-content.image-viewer {
+:is(ui-dialog-content, [data-slot="dialog-content"]).image-viewer {
   position: fixed;
   inset: 0;
+  z-index: 61;
   display: flex;
   flex-direction: column;
   width: min(1040px, calc(100vw - 96px));
@@ -757,13 +762,13 @@ ui-dialog-content.image-viewer {
   transition: opacity 220ms ease, transform 220ms cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
-ui-dialog-content.image-viewer[data-starting-style],
-ui-dialog-content.image-viewer[data-ending-style] {
+:is(ui-dialog-content, [data-slot="dialog-content"]).image-viewer[data-starting-style],
+:is(ui-dialog-content, [data-slot="dialog-content"]).image-viewer[data-ending-style] {
   opacity: 0;
   transform: translateY(10px) scale(0.985);
 }
 
-.image-viewer shop-product-media-lightbox,
+.image-viewer :is(shop-product-media-lightbox, [data-slot="lightbox"]),
 .image-viewer .lightbox {
   display: flex;
   flex: 1;
@@ -794,8 +799,9 @@ ui-dialog-content.image-viewer[data-ending-style] {
   text-transform: uppercase;
 }
 
-.image-viewer ui-dialog-title {
+.image-viewer :is(ui-dialog-title, [data-slot="dialog-title"]) {
   display: block;
+  margin: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -946,7 +952,7 @@ ui-dialog-content.image-viewer[data-ending-style] {
 }
 
 @media (max-width: 600px) {
-  ui-dialog-content.image-viewer {
+  :is(ui-dialog-content, [data-slot="dialog-content"]).image-viewer {
     width: calc(100vw - 24px);
     height: min(680px, calc(100dvh - 64px));
     border-radius: 16px;
@@ -1000,5 +1006,119 @@ ui-dialog-content.image-viewer[data-ending-style] {
   .thumb,
   .image-film-thumb {
     transition: none;
+  }
+}
+
+/* ----------------------------------------------------------- Shop Pay & Promise */
+
+@layer ui-sdk {
+  shop-pay-button a,
+  [data-shop-pay-button] {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    width: 100%;
+    min-height: 46px;
+    padding: 11px 20px;
+    border: 0;
+    border-radius: var(--shop-pay-radius, 8px);
+    background: #5a31f4;
+    color: #ffffff;
+    font: 600 15px/1 ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    letter-spacing: -0.01em;
+    text-decoration: none;
+    cursor: pointer;
+    transition: background-color 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
+  }
+
+  shop-pay-button a:hover:not([aria-disabled="true"]),
+  [data-shop-pay-button]:hover:not([aria-disabled="true"]) {
+    background: #4822d4;
+    box-shadow: 0 6px 18px rgb(90 49 244 / 28%);
+  }
+
+  shop-pay-button a:active:not([aria-disabled="true"]),
+  [data-shop-pay-button]:active:not([aria-disabled="true"]) {
+    background: #3c1bb8;
+    transform: translateY(1px);
+  }
+
+  shop-pay-button a[aria-disabled="true"],
+  [data-shop-pay-button][aria-disabled="true"] {
+    opacity: 0.45;
+    cursor: not-allowed;
+    pointer-events: none;
+  }
+
+  .shop-pay-label {
+    font-weight: 500;
+    font-size: 14px;
+    opacity: 0.94;
+  }
+
+  .shop-pay-wordmark {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    font-weight: 800;
+    font-size: 16px;
+    letter-spacing: -0.03em;
+  }
+
+  .shop-pay-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 5px 2.5px;
+    border-radius: 4px;
+    background: #ffffff;
+    color: #5a31f4;
+    font-weight: 800;
+    font-size: 12.5px;
+    line-height: 1;
+    letter-spacing: -0.01em;
+  }
+
+  shop-pay-installments,
+  [data-shop-pay-installments] {
+    margin: 8px 0 0;
+    font-size: 13px;
+    line-height: 1.4;
+    color: var(--shop-muted, #555e6b);
+  }
+
+  shop-pay-installments[hidden],
+  [data-shop-pay-installments][hidden],
+  shop-promise[hidden],
+  [data-shop-promise][hidden] {
+    display: none;
+  }
+
+  shop-promise,
+  [data-shop-promise] {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    border-radius: 10px;
+    background: rgb(90 49 244 / 8%);
+    border: 1px solid rgb(90 49 244 / 20%);
+    color: inherit;
+    font-size: 13px;
+    line-height: 1.35;
+  }
+
+  .shop-promise-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 7px;
+    border-radius: 999px;
+    background: #5a31f4;
+    color: #ffffff;
+    font-weight: 700;
+    font-size: 11px;
+    letter-spacing: 0.01em;
+    white-space: nowrap;
   }
 }

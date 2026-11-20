@@ -1,6 +1,6 @@
 import { definePrimitive } from "@ui-sdk/core"
 import { money } from "../shop"
-import type { Money } from "../variants"
+import { discountPercent, isOnSale, savingsAmount, type Money } from "../variants"
 
 type ShopPriceOptions = {
   /** What it costs now. A property: `{ amount, currencyCode }`. */
@@ -14,6 +14,12 @@ type ShopPriceState = {
   text: string
   /** The formatted earlier price, while it's higher. */
   compareText: string
+  /** The integer percentage saved while on sale, like 25 for 25% off. */
+  discountPercent: number | null
+  /** The exact money saved while on sale. */
+  savings: Money | null
+  /** The formatted amount saved while on sale, like "$10.00". */
+  savingsText: string
   onSale: boolean
 }
 
@@ -24,19 +30,20 @@ const settings = (options: ShopPriceOptions): State => ({
   compareAtPrice: options.compareAtPrice ?? null,
 })
 
-const onSale = (state: State) =>
-  Boolean(
-    state.price &&
-      state.compareAtPrice &&
-      state.compareAtPrice.currencyCode === state.price.currencyCode &&
-      Number(state.compareAtPrice.amount) > Number(state.price.amount),
-  )
+const onSale = (state: State) => isOnSale(state.price, state.compareAtPrice)
 
-const priceState = (state: State): ShopPriceState => ({
-  text: money(state.price),
-  compareText: onSale(state) ? money(state.compareAtPrice) : "",
-  onSale: onSale(state),
-})
+const priceState = (state: State): ShopPriceState => {
+  const sale = onSale(state)
+  const savings = savingsAmount(state.price, state.compareAtPrice)
+  return {
+    text: money(state.price),
+    compareText: sale ? money(state.compareAtPrice) : "",
+    discountPercent: discountPercent(state.price, state.compareAtPrice),
+    savings,
+    savingsText: savings ? money(savings) : "",
+    onSale: sale,
+  }
+}
 
 /**
  * A price, formatted for the market by `Intl.NumberFormat`, never by hand.
@@ -59,6 +66,8 @@ const shopPrice = definePrimitive({
   api: ({ store }) => ({
     getPrice: () => store.get().price,
     isOnSale: () => onSale(store.get()),
+    getDiscountPercent: () => discountPercent(store.get().price, store.get().compareAtPrice),
+    getSavings: () => savingsAmount(store.get().price, store.get().compareAtPrice),
   }),
   slots: (slot) => ({
     root: slot<{}, ShopPriceState>({
@@ -70,6 +79,10 @@ const shopPrice = definePrimitive({
     }),
     amount: slot<{}, ShopPriceState>({ state: priceState }),
     compare: slot<{}, ShopPriceState>({
+      state: priceState,
+      attrs: (state) => ({ hidden: onSale(state) ? undefined : "" }),
+    }),
+    savings: slot<{}, ShopPriceState>({
       state: priceState,
       attrs: (state) => ({ hidden: onSale(state) ? undefined : "" }),
     }),

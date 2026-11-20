@@ -4,7 +4,7 @@
  * one `<link rel="preload">` per distinct request.
  */
 
-type Image = { url: string; altText: string | null; width: number; height: number }
+type Image = { id?: string | null; url: string; altText: string | null; width: number; height: number }
 
 /** Shopify's modern CDN transforms; other image hosts are left untouched. */
 type ImageTransform = {

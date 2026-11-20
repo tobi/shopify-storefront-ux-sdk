@@ -5,20 +5,69 @@
     "": {
       "name": "shopify-storefront-ux-sdk",
       "devDependencies": {
+        "@solidjs/web": "2.0.3",
+        "@types/react": "^19.2.10",
+        "@types/react-dom": "^19.2.10",
         "@ui-sdk/core": "0.1.0-beta.5",
+        "@ui-sdk/react": "0.1.0-beta.5",
+        "@ui-sdk/solid": "0.1.0-beta.5",
         "@ui-sdk/web": "0.1.0-beta.5",
+        "react": "^19.2.0",
+        "react-dom": "^19.2.0",
+        "solid-js": "2.0.3",
         "typescript": "^5.9.3",
       },
       "peerDependencies": {
+        "@solidjs/web": ">=2.0.0",
         "@ui-sdk/core": "0.1.0-beta.5",
+        "@ui-sdk/react": "0.1.0-beta.5",
+        "@ui-sdk/solid": "0.1.0-beta.5",
         "@ui-sdk/web": "0.1.0-beta.5",
+        "react": ">=19.0.0",
+        "react-dom": ">=19.0.0",
+        "solid-js": ">=2.0.0",
       },
+      "optionalPeers": [
+        "@solidjs/web",
+        "@ui-sdk/react",
+        "@ui-sdk/solid",
+        "@ui-sdk/web",
+        "react",
+        "react-dom",
+        "solid-js",
+      ],
     },
   },
   "packages": {
+    "@solidjs/signals": ["@solidjs/signals@2.0.3", "", {}, "sha512-M6+kiJflqSvJRHRcmdsdIXpPLPkQrY817zWKKfxZ3z3ZRE5eEtddtWPrDXY4IM1Wz3zAqG+3Fx/HQIkAtpRwnA=="],
+
+    "@solidjs/web": ["@solidjs/web@2.0.3", "", { "dependencies": { "csstype": "^3.1.0", "seroval": "^1.8.0", "seroval-plugins": "^1.8.0" }, "peerDependencies": { "solid-js": "^2.0.3" } }, "sha512-XYl9JGOtQ8yJSZRnd6uC+5gYXsYvnIRNxhn89m+F1v6D4d4ZFdTJY2Lq/8XJ3YcjckkCrK/mNfd3kIiqqgnG7w=="],
+
+    "@types/react": ["@types/react@19.3.0", "", { "dependencies": { "csstype": "^3.2.2" } }, "sha512-N0rFCuH9YoxG9/m61l9MfpJKfmLOVU0em7ipIz6TRgSSkvReLB9vL85GB+yr8Bs5leqpvg96JSwF4ZS1s4viQg=="],
+
+    "@types/react-dom": ["@types/react-dom@19.3.0", "", { "peerDependencies": { "@types/react": "^19.3.0" } }, "sha512-ZI7bU42mZXXKHn/qNLEw2IrbiINU7X5+vfgdixBHkCNpYWXjKgfQ/P+uyGb5CjOLB9UcnTeg3rylQtV2hym44Q=="],
+
     "@ui-sdk/core": ["@ui-sdk/core@0.1.0-beta.5", "", {}, "sha512-dmunrxWrZ+vwldKJ6THQNYyyfbLFY6K82hBvIZSnuGwpEQmXKmM0iuANgGXtaqw8unSB2p9E5s3y7zfE9rgP6Q=="],
 
+    "@ui-sdk/react": ["@ui-sdk/react@0.1.0-beta.5", "", { "peerDependencies": { "@types/react": ">=19.2.10", "@ui-sdk/core": "^0.1.0-beta.5", "react": ">=19", "react-dom": ">=19" }, "optionalPeers": ["@types/react"] }, "sha512-Zfvl94ulACX511lQKQDnK7wVjhYUYsR5LLnCZ800NzQ3983TxZasHxXyC+KYNlvppkYfpELPlAbVslsSIGQ9/A=="],
+
+    "@ui-sdk/solid": ["@ui-sdk/solid@0.1.0-beta.5", "", { "peerDependencies": { "@solidjs/web": ">=2.0.0-rc.14 <3", "@ui-sdk/core": "^0.1.0-beta.5", "solid-js": ">=2.0.0-rc.14 <3" } }, "sha512-mTQWVtcu24Rl4Nka6qyifH8mpswSR7cNl1+ZnbIkbHmhDIS0fYsSF3QJTNd0jfqtBIsemI6sRc2QQ3k2inC2Gg=="],
+
     "@ui-sdk/web": ["@ui-sdk/web@0.1.0-beta.5", "", { "peerDependencies": { "@ui-sdk/core": "^0.1.0-beta.5" } }, "sha512-Ufgux0iewhxAA1bmxTZB0EI3fqZPnV5cJpUKxG79d3peXgQTYnblvUIRnChDVyfmYHL3w55fBeM6J+5yAr6zTg=="],
+
+    "csstype": ["csstype@3.2.4", "", {}, "sha512-PoKaoPzQapnEoqUSnHx1u6W6ku8CVEgKsnpmmzU3m1nwkidpPBQ8V/Zq2+bWNrsOKoKLwTGdbx6xF7BXP1zLVQ=="],
+
+    "react": ["react@19.3.1", "", {}, "sha512-QNhWdt7nrgVWWQG58QuGsAR3jv3Hbe4mb4vz7w2csnHavciZJgda1CPNaldF6eVxv90ud3jUXpKlHL69gO38yw=="],
+
+    "react-dom": ["react-dom@19.3.1", "", { "dependencies": { "scheduler": "^0.28.0" }, "peerDependencies": { "react": "^19.3.1" } }, "sha512-Y0bARz53lhEC1NMCASs0/j+faB/zqt3R8hpvg1e8+61ZVJ4UL0UdC4cBbXfZMcIuhrfgeILTLe+ZeBCavQPtKQ=="],
+
+    "scheduler": ["scheduler@0.28.0", "", {}, "sha512-juorfCmIkIw8tT+p5BXSm6PJjQF/ycEYmKyzURCIt/RaZIhL+PulbQ9Yu2z1HdOJDdqDTlxA1+xKBmHXJsczAw=="],
+
+    "seroval": ["seroval@1.8.2", "", {}, "sha512-zmMxi/9MdLK1MKazLmIP6Rk39RuK0Xydd+QHeOYntS37olJeTjB3+nwVj4ce/ZWiZJeRhcO5htfxt0mUzQBscQ=="],
+
+    "seroval-plugins": ["seroval-plugins@1.8.0", "", { "peerDependencies": { "seroval": "^1.8.0" } }, "sha512-96vBb12rDvPPwdKUgWw1op3fGq8AVBFOr0IllbnM72yR5J9WWXF18cQ4g1XfDO7HCyh2dt70P3XdtyRayP8FWg=="],
+
+    "solid-js": ["solid-js@2.0.3", "", { "dependencies": { "@solidjs/signals": "^2.0.3", "seroval": "^1.8.0", "seroval-plugins": "^1.8.0" } }, "sha512-XOHstv+GAJjfcSGZU9xfX5q6Mbqmv72IcdWh2JuMx3KvBbfpQPdy/Yl00A1ouk7A0etjqhNe799CPdr6i7koWg=="],
 
     "typescript": ["typescript@5.9.3", "", { "bin": { "tsc": "bin/tsc", "tsserver": "bin/tsserver" } }, "sha512-jl1vZzPDinLr9eUt3J/t7V6FgNEw9QjvBPdysz9KfQDD41fQrC2Y4vKQdiaUpFT4bXlb1RHhLpp8wtm6M5TgSw=="],
   }

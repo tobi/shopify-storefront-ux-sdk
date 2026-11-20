@@ -1,6 +1,6 @@
 import { createParts } from "@ui-sdk/web"
 import { shopVariantSelector } from "../primitives/variant-selector"
-import { matches, selectionOf, swatchOf, type ProductOption } from "../variants"
+import { matches, selectionOf, swatchImageOf, swatchOf, type ProductOption } from "../variants"
 import { cloneEach, replaceGenerated, setText } from "./util"
 
 /** The SDK's single-choice controls: each has a `value` property and fires `valuechange`. */
@@ -37,8 +37,10 @@ function fillValues(control: Control, option: ProductOption, cache: { instance: 
     const swatch = node.querySelector<HTMLElement>("[data-option-swatch]")
     if (swatch) {
       const color = swatchOf(option, value)
-      swatch.hidden = !color
+      const swatchImg = swatchImageOf(option, value)
+      swatch.hidden = !color && !swatchImg
       if (color) swatch.style.setProperty("--shop-swatch", color)
+      if (swatchImg) swatch.style.setProperty("--shop-swatch-image", `url("${swatchImg.url}")`)
     }
   })
   replaceGenerated(control, nodes)

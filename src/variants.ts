@@ -12,22 +12,32 @@ type Selection = Record<string, string>
 type Variant = {
   id: string
   title: string
+  sku?: string | null
   availableForSale: boolean
+  currentlyNotInStock?: boolean
+  quantityAvailable?: number | null
   selectedOptions: SelectedOption[]
   price: Money
   compareAtPrice: Money | null
+  unitPrice?: Money | null
   image: Image | null
 }
 
-type OptionValue = { name: string; swatch: { color: string | null } | null }
-type ProductOption = { name: string; values: string[]; optionValues?: OptionValue[] }
+type Swatch = {
+  color: string | null
+  image?: { previewImage: Image | null } | null
+}
+type OptionValue = { id?: string; name: string; swatch: Swatch | null }
+type ProductOption = { id?: string; name: string; values: string[]; optionValues?: OptionValue[] }
 
 /** How a value stands, given the other options chosen. */
 type ValueStatus = "available" | "sold-out" | "missing"
 
-/** The options a person chooses between: a lone "Default Title" is no choice. */
+const isDefaultValue = (value: string) => value === "Default Title" || value === "Default"
+
+/** The options a person actually chooses between: single-value or default-only options offer no choice. */
 const choicesOf = (options: readonly ProductOption[]) =>
-  options.filter((option) => !(option.values.length === 1 && option.values[0] === "Default Title"))
+  options.filter((option) => option.values.length > 1)
 
 const selectionOf = (variant: Variant | null | undefined): Selection => {
   const selection: Selection = {}
@@ -87,25 +97,75 @@ function nextVariant(
 const firstAvailable = (variants: readonly Variant[]) =>
   variants.find((variant) => variant.availableForSale) ?? variants[0] ?? null
 
-/** The variant said the way a person says it: "Large, Ocean", not "Large / Ocean". */
-const variantName = (variant: Variant | null | undefined) =>
-  !variant
-    ? ""
-    : variant.selectedOptions
-        .filter((option) => option.value !== "Default Title")
-        .map((option) => option.value)
-        .join(", ") || variant.title
+/** The variant said the way a person says it: "Large, Ocean", not "Large / Ocean". Empty for a default-only variant. */
+const variantName = (variant: Variant | null | undefined) => {
+  if (!variant) return ""
+  const parts = variant.selectedOptions
+    .filter((option) => !isDefaultValue(option.value))
+    .map((option) => option.value)
+  if (parts.length) return parts.join(", ")
+  return isDefaultValue(variant.title) ? "" : variant.title
+}
 
 const swatchOf = (option: ProductOption, value: string) =>
   option.optionValues?.find((entry) => entry.name === value)?.swatch?.color ?? null
 
+const swatchImageOf = (option: ProductOption, value: string) =>
+  option.optionValues?.find((entry) => entry.name === value)?.swatch?.image?.previewImage ?? null
+
+/** Whether `compareAtPrice` is strictly higher than `price` in the same currency. */
+const isOnSale = (price: Money | null | undefined, compareAtPrice: Money | null | undefined): boolean =>
+  Boolean(
+    price &&
+      compareAtPrice &&
+      compareAtPrice.currencyCode === price.currencyCode &&
+      Number(compareAtPrice.amount) > Number(price.amount),
+  )
+
+/** Integer percentage saved when on sale (e.g. 25 for 25% off), or null. */
+const discountPercent = (
+  price: Money | null | undefined,
+  compareAtPrice: Money | null | undefined,
+): number | null => {
+  if (!isOnSale(price, compareAtPrice) || !price || !compareAtPrice) return null
+  const current = Number(price.amount)
+  const original = Number(compareAtPrice.amount)
+  if (!Number.isFinite(current) || !Number.isFinite(original) || original <= 0) return null
+  const pct = Math.round(((original - current) / original) * 100)
+  return pct > 0 ? pct : null
+}
+
+/** Exact money saved when on sale, or null. */
+const savingsAmount = (
+  price: Money | null | undefined,
+  compareAtPrice: Money | null | undefined,
+): Money | null => {
+  if (!isOnSale(price, compareAtPrice) || !price || !compareAtPrice) return null
+  const diff = Number(compareAtPrice.amount) - Number(price.amount)
+  if (!Number.isFinite(diff) || diff <= 0) return null
+  return { amount: diff.toFixed(2), currencyCode: price.currencyCode }
+}
+
+/** Extracts the numeric ID from a Shopify GID like `gid://shopify/ProductVariant/12345`. */
+const numericGid = (gid: string | null | undefined): string | null => {
+  if (!gid) return null
+  const match = /\/(\d+)(?:\?.*)?$/.exec(gid)
+  if (match) return match[1]
+  return /^\d+$/.test(gid) ? gid : null
+}
+
 export {
   choicesOf,
+  discountPercent,
   findVariant,
   firstAvailable,
+  isOnSale,
   matches,
   nextVariant,
+  numericGid,
+  savingsAmount,
   selectionOf,
+  swatchImageOf,
   swatchOf,
   valueStatus,
   variantName,
@@ -114,6 +174,7 @@ export {
   type ProductOption,
   type SelectedOption,
   type Selection,
+  type Swatch,
   type ValueStatus,
   type Variant,
 }

@@ -1,0 +1,301 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Snowdevil · Web Components Storefront</title>
+    <link rel="stylesheet" href="./styles.css" />
+    <script type="module" src="./main.ts"></script>
+  </head>
+  <body>
+    <shop-cart
+      endpoint="https://www.snowdevil.ca/api/2026-10/graphql.json"
+      country="CA"
+      language="en"
+      storage-key="snowdevil.wc.cart"
+      aria-label="Shopping cart"
+    >
+      <header class="masthead">
+        <a class="wordmark" href="#/">
+          <svg class="horns" viewBox="0 0 40 28" aria-hidden="true">
+            <path d="M4 26C2 14 6 5 13 1c-3 7-2 13 3 17M36 26c2-12-2-21-9-25 3 7 2 13-3 17" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" />
+          </svg>
+          <span>Snowdevil</span>
+        </a>
+        <div class="masthead-actions">
+          <shop-market-selector class="market">
+            <select aria-label="Country and currency"></select>
+          </shop-market-selector>
+          <ui-button class="bag-open">
+            <button type="button" class="bag-trigger" aria-haspopup="dialog">
+              <span>Bag</span>
+              <shop-cart-count class="bag-count">0</shop-cart-count>
+            </button>
+          </ui-button>
+        </div>
+      </header>
+
+      <main>
+        <section id="view-home">
+          <section class="hero">
+            <div class="hero-inner">
+              <p class="eyebrow">Est. 2004 · Ottawa, ON · Web Components + shopify-storefront-ux-sdk</p>
+              <h1>Go where the groomers end.</h1>
+              <p>Snowboards, bindings, and mountain optics running live on Shopify Storefront API.</p>
+            </div>
+          </section>
+
+          <shop-catalog class="catalog" aria-label="Products" default-sort="featured" page-size="24">
+            <div class="catalog-head">
+              <h2>Shop winter gear</h2>
+              <shop-catalog-status class="catalog-status"></shop-catalog-status>
+            </div>
+            <div class="toolbar">
+              <ui-segmented-control class="departments" aria-label="Department" value="all">
+                <ui-segmented-control-item value="all"><button type="button">Everything</button></ui-segmented-control-item>
+                <ui-segmented-control-item value="Snowboard"><button type="button">Boards</button></ui-segmented-control-item>
+                <ui-segmented-control-item value="Binding"><button type="button">Bindings</button></ui-segmented-control-item>
+                <ui-segmented-control-item value="Goggles"><button type="button">Goggles</button></ui-segmented-control-item>
+              </ui-segmented-control>
+              <input class="search-input" type="search" aria-label="Search products" placeholder="Search boards, brands…" data-search />
+              <button type="button" class="chip" aria-pressed="false" data-sale-toggle>On sale</button>
+              <select class="sort-select" aria-label="Sort products" data-sort>
+                <option value="featured">Featured</option>
+                <option value="newest">Newest</option>
+                <option value="price-low">Price, low to high</option>
+                <option value="price-high">Price, high to low</option>
+                <option value="title">Name</option>
+              </select>
+            </div>
+
+            <shop-catalog-results class="grid">
+              <template>
+                <article class="card">
+                  <div class="plate">
+                    <shop-image sizes="(max-width: 640px) 50vw, 280px"><img alt="" /></shop-image>
+                    <span class="badge badge-out" data-catalog-badge-sold-out hidden>Sold out</span>
+                    <span class="badge badge-sale" data-catalog-badge-sale hidden></span>
+                    <button type="button" class="quick-add" data-catalog-quick-add hidden>+ Quick add</button>
+                  </div>
+                  <div class="card-meta">
+                    <span class="card-vendor"><span data-catalog-vendor></span> · <span data-catalog-type></span></span>
+                    <a class="card-link" data-catalog-link><span data-catalog-title></span></a>
+                    <shop-price class="card-price">
+                      <shop-price-amount></shop-price-amount>
+                      <shop-price-compare><s data-text></s></shop-price-compare>
+                    </shop-price>
+                  </div>
+                </article>
+              </template>
+            </shop-catalog-results>
+            <shop-catalog-empty class="empty" hidden>
+              <p>Nothing matches your current filters.</p>
+            </shop-catalog-empty>
+            <button type="button" class="load-more" data-catalog-load-more hidden>Show more</button>
+          </shop-catalog>
+        </section>
+
+        <section id="view-product" hidden>
+          <shop-product class="product" aria-label="Buy box">
+            <nav class="breadcrumb" aria-label="Breadcrumb">
+              <a href="#/">← Back to all gear</a>
+            </nav>
+            <shop-product-media hover-zoom sizes="(max-width: 900px) 90vw, 540px">
+              <ui-carousel class="media-main" data-media-main aria-label="Product images" loop>
+                <ui-carousel-viewport class="media-viewport">
+                  <ui-carousel-content class="media-track">
+                    <template>
+                      <ui-carousel-item class="media-slide">
+                        <ui-dialog-trigger>
+                          <button type="button" class="media-open">
+                            <shop-product-media-zoom class="media-frame">
+                              <shop-image><img class="media-image" /></shop-image>
+                            </shop-product-media-zoom>
+                            <span class="media-hint" aria-hidden="true"><span class="media-hint-zoom">Hover to zoom · </span>Click to enlarge</span>
+                          </button>
+                        </ui-dialog-trigger>
+                      </ui-carousel-item>
+                    </template>
+                  </ui-carousel-content>
+                </ui-carousel-viewport>
+                <ui-carousel-previous><button type="button" class="media-step media-previous" aria-label="Previous image">‹</button></ui-carousel-previous>
+                <ui-carousel-next><button type="button" class="media-step media-next" aria-label="Next image">›</button></ui-carousel-next>
+                <ui-carousel-indicator-group class="thumbs" aria-label="Choose a product image">
+                  <template>
+                    <ui-carousel-indicator><button type="button" class="thumb"><shop-image><img /></shop-image></button></ui-carousel-indicator>
+                  </template>
+                </ui-carousel-indicator-group>
+              </ui-carousel>
+
+              <ui-dialog>
+                <ui-dialog-backdrop class="image-backdrop" hidden></ui-dialog-backdrop>
+                <ui-dialog-content class="image-viewer" hidden>
+                  <shop-product-media-lightbox>
+                    <header class="image-viewer-head">
+                      <ui-dialog-title>Product images</ui-dialog-title>
+                      <ui-dialog-close><button type="button" class="image-control image-close" aria-label="Close image lightbox">×</button></ui-dialog-close>
+                    </header>
+                    <ui-carousel class="lightbox" data-media-lightbox aria-label="Enlarged product images" loop>
+                      <div class="image-viewer-stage">
+                        <ui-carousel-viewport class="lightbox-viewport">
+                          <ui-carousel-content class="lightbox-track">
+                            <template>
+                              <ui-carousel-item class="lightbox-slide"><shop-image><img class="lightbox-image" /></shop-image></ui-carousel-item>
+                            </template>
+                          </ui-carousel-content>
+                        </ui-carousel-viewport>
+                        <ui-carousel-previous><button type="button" class="image-control image-previous" aria-label="Previous image">‹</button></ui-carousel-previous>
+                        <ui-carousel-next><button type="button" class="image-control image-next" aria-label="Next image">›</button></ui-carousel-next>
+                      </div>
+                      <footer class="image-viewer-foot">
+                        <div class="image-viewer-meta">
+                          <span class="image-caption" data-media-caption></span>
+                          <span class="image-counter" data-media-count aria-hidden="true"></span>
+                        </div>
+                        <ui-carousel-indicator-group class="image-filmstrip" aria-label="Choose an enlarged image">
+                          <template>
+                            <ui-carousel-indicator><button type="button" class="image-film-thumb"><shop-image><img /></shop-image></button></ui-carousel-indicator>
+                          </template>
+                        </ui-carousel-indicator-group>
+                      </footer>
+                    </ui-carousel>
+                  </shop-product-media-lightbox>
+                </ui-dialog-content>
+              </ui-dialog>
+            </shop-product-media>
+            <div class="product-buy">
+              <p class="eyebrow" data-product-vendor></p>
+              <h1 class="product-title" data-product-title></h1>
+              <shop-price class="product-price">
+                <shop-price-amount></shop-price-amount>
+                <shop-price-compare><s data-text></s></shop-price-compare>
+                <shop-price-savings></shop-price-savings>
+              </shop-price>
+              <shop-promise>
+                <span class="shop-promise-badge">Shop Promise</span>
+                <span>Expected <strong data-promise-date></strong></span>
+              </shop-promise>
+              <shop-variant-selector class="options" aria-label="Options">
+                <div data-variant-options>
+                  <template>
+                    <shop-variant-option>
+                      <p data-option-heading><span data-option-name></span>: <span data-picked></span></p>
+                      <ui-radio-group>
+                        <template>
+                          <label class="swatch">
+                            <ui-radio></ui-radio>
+                            <span class="dot" data-option-swatch aria-hidden="true" hidden></span>
+                            <span data-option-label></span><span class="visually-hidden" data-option-note></span>
+                          </label>
+                        </template>
+                      </ui-radio-group>
+                    </shop-variant-option>
+                  </template>
+                </div>
+              </shop-variant-selector>
+              <div class="buy-row">
+                <ui-number-input data-quantity default-value="1" min="1" max="10" aria-label="Quantity">
+                  <ui-number-input-group>
+                    <ui-number-input-decrement><button type="button" aria-label="Decrease quantity">−</button></ui-number-input-decrement>
+                    <ui-number-input-control><input aria-label="Quantity" /></ui-number-input-control>
+                    <ui-number-input-increment><button type="button" aria-label="Increase quantity">+</button></ui-number-input-increment>
+                  </ui-number-input-group>
+                </ui-number-input>
+                <ui-button data-product-add pending-announcement="Adding to bag">
+                  <button type="button" class="add">Add to bag</button>
+                </ui-button>
+              </div>
+              <shop-pay>
+                <shop-pay-button><a href="#"></a></shop-pay-button>
+                <shop-pay-installments></shop-pay-installments>
+              </shop-pay>
+              <p class="stock" data-product-stock></p>
+              <div class="description" data-product-description></div>
+            </div>
+          </shop-product>
+        </section>
+      </main>
+
+      <ui-drawer side="right">
+        <ui-drawer-backdrop hidden></ui-drawer-backdrop>
+        <ui-drawer-content hidden>
+          <header class="bag-head">
+            <ui-drawer-title>Your bag</ui-drawer-title>
+            <ui-drawer-close><button type="button" class="bag-close" aria-label="Close bag">×</button></ui-drawer-close>
+          </header>
+
+          <shop-cart-shipping threshold="250" class="shipping-meter">
+            <p data-shop-shipping-text></p>
+            <div class="shipping-track" aria-hidden="true">
+              <span class="shipping-fill" style="width: calc(var(--shop-shipping-progress, 0) * 100%)"></span>
+            </div>
+          </shop-cart-shipping>
+
+          <shop-cart-lines class="bag-lines" empty-message="Your bag is empty.">
+            <p class="empty" data-shop-empty></p>
+            <ul data-shop-lines></ul>
+            <template>
+              <li class="line">
+                <span class="line-image" data-shop-line-image><img alt="" width="64" height="76" /></span>
+                <div>
+                  <a data-shop-line-link><p class="line-title" data-shop-line-title></p></a>
+                  <p class="line-variant" data-shop-line-variant></p>
+                  <ui-number-input>
+                    <ui-number-input-group>
+                      <ui-number-input-decrement>
+                        <button type="button" data-step="dec">
+                          <span data-shop-minus aria-hidden="true">−</span>
+                          <span data-shop-bin aria-hidden="true" hidden>🗑</span>
+                        </button>
+                      </ui-number-input-decrement>
+                      <ui-number-input-control><input aria-label="Quantity" /></ui-number-input-control>
+                      <ui-number-input-increment><button type="button" data-step="inc">+</button></ui-number-input-increment>
+                    </ui-number-input-group>
+                  </ui-number-input>
+                </div>
+                <span class="line-price" data-shop-line-price></span>
+              </li>
+            </template>
+            <shop-cart-undo class="undo" hidden>
+              <span>Removed item.</span>
+              <shop-cart-undo-trigger><button type="button">Undo</button></shop-cart-undo-trigger>
+            </shop-cart-undo>
+          </shop-cart-lines>
+
+          <footer class="bag-foot">
+            <shop-cart-discount class="discount">
+              <form>
+                <div class="shop-discount-row">
+                  <input name="code" aria-label="Discount code" placeholder="Discount code" data-shop-discount-input />
+                  <button type="submit">Apply</button>
+                </div>
+                <p class="fine" data-shop-discount-status></p>
+                <ul data-shop-discount-applied>
+                  <template>
+                    <li>
+                      <span data-shop-discount-code></span>
+                      <span data-shop-discount-note></span>
+                      <button type="button" data-shop-discount-remove>×</button>
+                    </li>
+                  </template>
+                </ul>
+              </form>
+            </shop-cart-discount>
+            <shop-cart-note class="cart-note">
+              <textarea aria-label="Order note" placeholder="Add an order note…"></textarea>
+            </shop-cart-note>
+            <shop-cart-summary>
+              <p class="subtotal"><span>Subtotal</span> <strong data-shop-subtotal></strong></p>
+            </shop-cart-summary>
+            <shop-pay data-cart-pay>
+              <shop-pay-button><a href="#"></a></shop-pay-button>
+            </shop-pay>
+            <shop-cart-checkout><a class="checkout" href="#" data-agent-confirm="Go to Shopify checkout">Checkout</a></shop-cart-checkout>
+          </footer>
+        </ui-drawer-content>
+      </ui-drawer>
+
+      <shop-cart-status class="visually-hidden"></shop-cart-status>
+    </shop-cart>
+  </body>
+</html>

@@ -7,14 +7,18 @@ import {
   configureShop,
   currentCart,
   ensureCart,
+  money,
   quantityLimit,
+  removeDiscount,
   removeLine,
   setLineQuantity,
   subscribeAnnouncements,
   subscribeCart,
   subscribeUndo,
+  updateCartNote,
   type Cart,
   type LineInput,
+  type Money,
   type RemovedLine,
   type ShopConfig,
 } from "../shop"
@@ -28,6 +32,8 @@ type LineReason = "press" | "input" | "undo-press" | "imperative"
 type ShopCartOptions = {
   /** The Storefront API endpoint. Defaults to `https://mock.shop/api`. */
   endpoint?: string
+  /** Optional public Storefront API access token (`X-Shopify-Storefront-Access-Token`). */
+  token?: string
   /** Where the cart id is kept. Defaults to `shop.cart`. */
   storageKey?: string
   /** The market's country code, for `@inContext`. */
@@ -48,6 +54,10 @@ type ShopCartOptions = {
   onLineRemove?: (line: string, details: ChangeDetails<LineReason>) => void
   /** Runs before a discount code is sent. */
   onDiscountApply?: (code: string, details: ChangeDetails<"submit" | "imperative">) => void
+  /** Runs before a discount code is removed. */
+  onDiscountRemove?: (code: string, details: ChangeDetails<"press" | "imperative">) => void
+  /** Runs before a cart note is saved. */
+  onNoteChange?: (note: string, details: ChangeDetails<"input" | "imperative">) => void
 }
 
 type State = {
@@ -70,6 +80,7 @@ type ShopCartState = {
 const configOf = (options: ShopCartOptions): Partial<ShopConfig> => {
   const next: Partial<ShopConfig> = {}
   if (options.endpoint) next.endpoint = options.endpoint
+  if (options.token !== undefined) next.token = options.token
   if (options.storageKey) next.storageKey = options.storageKey
   if (options.country) next.country = options.country
   if (options.language) next.language = options.language
@@ -101,6 +112,7 @@ const shopCart = definePrimitive({
   name: "shop-cart",
   options: {
     endpoint: "string",
+    token: "string",
     storageKey: "string",
     country: "string",
     language: "string",
@@ -110,6 +122,8 @@ const shopCart = definePrimitive({
     onLineQuantityChange: "callback",
     onLineRemove: "callback",
     onDiscountApply: "callback",
+    onDiscountRemove: "callback",
+    onNoteChange: "callback",
   },
   // The server owns the cart: nothing here is a value the page controls.
   controlled: [],
@@ -249,6 +263,36 @@ const shopCart = definePrimitive({
           return false
         }
       },
+      /** Removes a discount code from the cart. */
+      removeDiscount: async (code: string, details: { event?: Event } = {}) => {
+        const trimmed = code.trim()
+        if (!trimmed) return false
+        const reason = details.event ? "press" : "imperative"
+        if (dispatch(context, "onDiscountRemove", trimmed, { reason, event: details.event })) return false
+        store.set({ discount: { status: "pending", message: `Removing ${trimmed}…` } })
+        try {
+          await removeDiscount(trimmed)
+          store.set({ discount: { status: "idle", message: `Removed discount ${trimmed}.` } })
+          say(`Removed discount ${trimmed}.`)
+          return true
+        } catch (error) {
+          store.set({ discount: { status: "error", message: (error as Error).message } })
+          return false
+        }
+      },
+      /** Saves a note on the cart (gift message, delivery instructions). */
+      setNote: async (note: string, details: { event?: Event } = {}) => {
+        const reason = details.event ? "input" : "imperative"
+        if (dispatch(context, "onNoteChange", note, { reason, event: details.event })) return false
+        try {
+          await updateCartNote(note)
+          say(note.trim() ? "Order note saved." : "Order note cleared.")
+          return true
+        } catch (error) {
+          say(`Could not save note. ${(error as Error).message}`)
+          throw error
+        }
+      },
       refresh: () => ensureCart(),
       internal: { limit: () => quantityLimit(), options },
     }
@@ -301,14 +345,22 @@ const shopCart = definePrimitive({
       state: cartState,
       attrs: (state) => ({ "data-empty": isEmpty(state) ? "" : undefined }),
     }),
-    shipping: slot<{ threshold: number }, { progress: number; unlocked: boolean }>({
+    shipping: slot<
+      { threshold: number },
+      { progress: number; unlocked: boolean; remaining: Money | null; remainingText: string }
+    >({
       props: { threshold: "number" },
       state: (state, part) => {
         const threshold = Math.max(0, part.props.threshold || 0)
         const subtotal = Number(state.cart?.subtotal.amount ?? 0)
+        const currencyCode = state.cart?.subtotal.currencyCode ?? "USD"
+        const left = Math.max(0, Math.round((threshold - subtotal) * 100) / 100)
+        const remaining = left > 0 ? { amount: left.toFixed(2), currencyCode } : null
         return {
-          progress: threshold > 0 ? Math.min(1, subtotal / threshold) : 1,
+          progress: threshold > 0 ? Math.min(1, Math.max(0, subtotal / threshold)) : 1,
           unlocked: subtotal >= threshold,
+          remaining,
+          remainingText: remaining ? money(remaining) : "",
         }
       },
       attrs: (state, part) => {
@@ -316,7 +368,7 @@ const shopCart = definePrimitive({
         const subtotal = Number(state.cart?.subtotal.amount ?? 0)
         const progress = threshold > 0 ? Math.min(1, Math.max(0, subtotal / threshold)) : 1
         return {
-          hidden: state.cart ? undefined : "",
+          hidden: state.cart && state.cart.lines.length > 0 ? undefined : "",
           "data-unlocked": subtotal >= threshold ? "" : undefined,
           style: `--shop-shipping-progress: ${Number(progress.toFixed(3))}`,
         }
@@ -350,13 +402,17 @@ const shopCart = definePrimitive({
         }
       },
     }),
+    note: slot<{}, { note: string }>({
+      state: (state) => ({ note: state.cart?.note ?? "" }),
+      attrs: (state) => ({ hidden: isEmpty(state) ? "" : undefined }),
+    }),
     status: slot<{}, { message: string }>({
       role: "status",
       state: (state) => ({ message: state.message }),
       attrs: () => ({ "aria-live": "polite", "aria-atomic": "true" }),
     }),
   }),
-  agent: { actions: ["add", "setQuantity", "remove", "restore", "applyDiscount"] },
+  agent: { actions: ["add", "setQuantity", "remove", "restore", "applyDiscount", "removeDiscount", "setNote"] },
 })
 
 export {

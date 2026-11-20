@@ -1,30 +1,38 @@
 # shopify-storefront-ux-sdk
 
-Storefront components for Shopify's [Storefront API](https://shopify.dev/docs/api/storefront):
-responsive product images, prices, variant selectors, a product gallery with a
-lightbox, a buy box, bundles and a cart. They're custom elements built on
-[ui-sdk](https://github.com/vercel-labs/ui): keyboard, focus, dismissal,
-announcements and ARIA come from the SDK; product data, money and the cart
-come from Shopify; the markup and styles are yours.
+An idiomatic [ui-sdk](https://github.com/vercel-labs/ui) implementation of everything you need to build excellent Shopify storefronts: non-lossy Storefront API data access, responsive Shopify CDN images, prices & savings, variant selectors, product galleries with lightbox, buy boxes, bundles, catalog browsing, predictive search, recommendations, on-brand Shop Pay & Shop Promise, currency/market switching, and a full cart — for **Web Components**, **SolidJS**, and **React**.
 
-- **Works with any markup.** Each component fills in markup you write, from
-  `<template>`s and `data-*` hooks. No shadow DOM, no HTML strings.
-- **Accessible by default.** It uses the SDK's carousel, dialog, radio group
-  and number input. Sold-out and unavailable choices say so in text, and focus
-  returns where it should.
-- **Fast images.** Shopify CDN `srcset`s capped at the source size, intrinsic
-  dimensions, an eager LCP image, and preloads on hover and focus. Nothing
-  extra loads when the visitor is saving data.
-- **Agent-ready.** Every component lists the methods an agent can call, and an
-  agent's changes fire the same cancelable events as a person's.
+- **Works with any markup.** Headless, light-DOM / render-prop friendly. No Shadow DOM, no HTML strings.
+- **Accessible by default.** Keyboard navigation, roving focus, dismissal, live announcements, and ARIA come from `@ui-sdk/*`. Sold-out and cross-combination variant choices remain selectable and announce clearly.
+- **Non-lossy Storefront API data.** Preserves `@inContext(country, language)`, optional `X-Shopify-Storefront-Access-Token`, full product/variant/swatch metadata, server-computed cart line costs, code & automatic discount allocations, notes, collections with native filters, predictive search, recommendations, menus, and localization.
+- **Fast images.** Shopify CDN `srcset`s capped at the source size (max 5,760px), intrinsic dimensions, eager LCP hints, and intent preloads skipped under `saveData` or 2G.
+- **Agent-ready.** Every component declares its `agent.actions`, routes agent calls through the same cancelable events (`source: "agent"`), and gates checkout & Shop Pay behind `data-agent-confirm`.
 
 ```text
-data          images.ts · variants.ts · shop.ts        no UI: CDN URLs, variant model, Storefront client + cart store
-low level     <shop-image>  <shop-price>  <shop-variant-selector>
-mid level     <shop-product-media>                     gallery + lightbox, on ui-carousel and ui-dialog
-high level    <shop-product>  <shop-bundle>            compose the low-level pieces
-cart          <shop-cart> and its parts                one owner for count, lines, totals, codes, checkout
+entries
+  shopify-storefront-ux-sdk            Web Components (@ui-sdk/web) + core
+  shopify-storefront-ux-sdk/core       Headless data access + definePrimitive definitions (no DOM side effects)
+  shopify-storefront-ux-sdk/solid      SolidJS components (@ui-sdk/solid)
+  shopify-storefront-ux-sdk/react      React 19 components (@ui-sdk/react)
+  shopify-storefront-ux-sdk/styles.css Optional base stylesheet (gallery, lightbox, cart, on-brand Shop Pay)
+
+layers
+  data          shop.ts · images.ts · variants.ts        Storefront GraphQL client, cart store, CDN URLs, variant & money model
+  low level     shop-image · shop-price · shop-variant-selector · shop-pay · shop-promise
+  discovery     shop-catalog · shop-search · shop-recommendations · shop-market-selector
+  product       shop-product-media · shop-product · shop-bundle
+  cart          shop-cart and its parts (count, lines, undo, empty, summary, total, shipping, discount, note, checkout, status)
 ```
+
+## Examples (Snowdevil)
+
+Three complete, runnable storefronts against [Snowdevil](https://www.snowdevil.ca)'s live Shopify Storefront API — showcasing catalog filtering, search, sorting, quick-add, currency/market switching, product pages with variant selection, on-brand Shop Pay + installments, Shop Promise, and a full cart drawer:
+
+| Framework | Example | Run |
+| --- | --- | --- |
+| **SolidJS** | [`examples/snowdevil-solid`](./examples/snowdevil-solid) | `cd examples/snowdevil-solid && bun install && bun run dev` |
+| **React** | [`examples/snowdevil-react`](./examples/snowdevil-react) | `cd examples/snowdevil-react && bun install && bun run dev` |
+| **Web Components** | [`examples/snowdevil-webcomponents`](./examples/snowdevil-webcomponents) | `cd examples/snowdevil-webcomponents && bun install && bun run dev` |
 
 ## Quick start
 
@@ -497,8 +505,9 @@ can't disagree.
 | Attribute | |
 | --- | --- |
 | `endpoint` | Storefront API URL. Default `https://mock.shop/api` |
+| `token` | Optional public Storefront API access token (`X-Shopify-Storefront-Access-Token`) |
 | `storage-key` | Where the cart id lives. Default `shop.cart` |
-| `country`, `language` | The market, for `@inContext` |
+| `country`, `language` | The market, for `@inContext` and `buyerIdentity` |
 | `max-quantity` | The most units a line may hold. Default 10 |
 
 | Part | What it does |
@@ -510,15 +519,27 @@ can't disagree.
 | `<shop-cart-summary>` | `[data-shop-subtotal]` |
 | `<shop-cart-total>` | `[data-shop-total-subtotal]`, `-shipping`, `-tax`, `-grand`, `-count`, and discount rows from the `<template>` in `[data-shop-total-discount-list]` |
 | `<shop-cart-shipping threshold="75">` | `[data-shop-shipping-text]`, `[data-shop-shipping-remaining]`, `data-unlocked`, `--shop-shipping-progress` (0–1) for a bar inside; announces the crossing |
-| `<shop-cart-discount>` | Wraps a `<form>` with an input named `code`: submit applies it. `[data-shop-discount-status]`, applied codes from the `<template>` in `[data-shop-discount-applied]`, `data-busy` / `data-applied` / `data-error`, `aria-invalid` on the input |
+| `<shop-cart-discount>` | Wraps a `<form>` with an input named `code`: submit applies it, `[data-shop-discount-remove]` removes it. `[data-shop-discount-status]`, applied codes from the `<template>` in `[data-shop-discount-applied]`, `data-busy` / `data-applied` / `data-error`, `aria-invalid` on the input |
+| `<shop-cart-note>` | Wraps a `<textarea>` or `<input>` for gift messages / delivery instructions, saved via `cartNoteUpdate` |
 | `<shop-cart-checkout>` | Wraps the checkout `<a>`: `href` is the cart's `checkoutUrl`, disabled while empty. Mark it `data-agent-confirm` so an agent needs a person |
 | `<shop-cart-status>` | The polite live region every cart change speaks through |
 
 | | |
 | --- | --- |
-| Events | `cartchange` (the server's cart arrived), and cancelable `lineadd`, `linequantitychange`, `lineremove`, `discountapply` |
-| API | `getCart()`, `getCount()`, `add(variantId, n)` or `add([{ variantId, quantity, attributes }])`, `setQuantity(lineId, n)`, `remove(lineId)`, `restore()`, `applyDiscount(code)`, `refresh()` |
-| Agent | `add`, `setQuantity`, `remove`, `restore`, `applyDiscount` |
+| Events | `cartchange` (the server's cart arrived), and cancelable `lineadd`, `linequantitychange`, `lineremove`, `discountapply`, `discountremove`, `notechange` |
+| API | `getCart()`, `getCount()`, `add(variantId, n)` or `add([{ variantId, quantity, attributes }])`, `setQuantity(lineId, n)`, `remove(lineId)`, `restore()`, `applyDiscount(code)`, `removeDiscount(code)`, `setNote(note)`, `refresh()` |
+| Agent | `add`, `setQuantity`, `remove`, `restore`, `applyDiscount`, `removeDiscount`, `setNote` |
+
+### Additional Commerce Components
+
+All available across `shopify-storefront-ux-sdk` (Web Components), `shopify-storefront-ux-sdk/solid`, `shopify-storefront-ux-sdk/react`, and `shopify-storefront-ux-sdk/core`:
+
+- **`<shop-catalog>` / `ShopCatalog`** — Global or collection-scoped product browsing with search, product-type filter, vendor filter, on-sale toggle, sort, cursor pagination, quick-add, and automatic reload on currency/market change.
+- **`<shop-pay>` / `ShopPay` + `ShopPayButton` + `ShopPayInstallments`** — On-brand Shop Pay (`#5A31F4`) accelerated checkout for a product variant or active cart, plus Shop Pay Installments calculation; gated with `data-agent-confirm`.
+- **`<shop-promise>` / `ShopPromise`** — Shop Promise delivery window badge with business-day math, daily dispatch cutoff, locale-formatted dates, and sold-out awareness.
+- **`<shop-market-selector>` / `ShopMarketSelector`** — Country/currency/language switcher backed by Shopify's `localization` API; updates `@inContext`, updates live cart `buyerIdentity`, and refreshes active catalogs & products.
+- **`<shop-search>` / `ShopSearch`** — Debounced, abortable predictive search (`queries`, `products`, `collections`) backed by Shopify's `predictiveSearch`.
+- **`<shop-recommendations>` / `ShopRecommendations`** — Native ML-powered `productRecommendations` (`RELATED` or `COMPLEMENTARY`).
 
 ### `<shop-store-picker>`: switch between mock.shop stores
 
@@ -569,8 +590,7 @@ as a person's, with `source: "agent"`. Checkout is a link marked
 
 ```sh
 bun install
-bun run typecheck
-bun test          # the data layer and primitives, without a DOM
+bun run check     # strict typecheck (core/web, solid, react) + unit tests
 ```
 
 ## License

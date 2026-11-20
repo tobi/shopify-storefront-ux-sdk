@@ -227,6 +227,7 @@ const shopBundle = definePrimitive({
     const change = createChange(context)
     const selectors = new Map<string, SelectorApi>()
     let cart: CartApi | null = null
+    let limit = 10
 
     const lines = (): LineInput[] => {
       const { items, quantity, title } = store.get()
@@ -244,7 +245,7 @@ const shopBundle = definePrimitive({
       setOption: (item: string, name: string, value: string, details: { reason?: VariantChangeReason; event?: Event } = {}) =>
         selectors.get(item)?.setOption(name, value, details) ?? false,
       setQuantity: (value: number, details: { event?: Event } = {}) =>
-        change("quantity", Math.min(10, Math.max(1, Math.round(Number(value) || 1))), {
+        change("quantity", Math.min(limit, Math.max(1, Math.round(Number(value) || 1))), {
           reason: details.event ? "press" : "imperative",
           event: details.event,
         }),
@@ -270,8 +271,9 @@ const shopBundle = definePrimitive({
         }
       },
       internal: {
-        connect: (next: { cart?: CartApi | null }) => {
+        connect: (next: { cart?: CartApi | null; limit?: number }) => {
           if (next.cart !== undefined) cart = next.cart
+          if (next.limit) limit = next.limit
         },
         register: (item: string, selector: SelectorApi) => {
           selectors.set(item, selector)

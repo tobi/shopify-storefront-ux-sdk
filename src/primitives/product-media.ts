@@ -244,6 +244,7 @@ const shopProductMedia = definePrimitive({
   },
   slots: (slot) => ({
     root: slot<{}, ShopProductMediaState>({
+      role: "region",
       state: (state) => ({
         value: state.value,
         count: state.images.length,
@@ -251,6 +252,7 @@ const shopProductMedia = definePrimitive({
         position: state.images.length ? `${state.value + 1} of ${state.images.length}` : "",
       }),
       attrs: (state) => ({
+        "aria-label": state.title ? `${state.title} gallery` : "Product gallery",
         "data-open": state.open ? "" : undefined,
         "data-hover-zoom": state.hoverZoom ? "" : undefined,
         "data-empty": state.images.length ? undefined : "",

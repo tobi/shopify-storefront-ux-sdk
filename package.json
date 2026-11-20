@@ -19,6 +19,9 @@
   ],
   "exports": {
     ".": "./src/index.ts",
+    "./core": "./src/core.ts",
+    "./solid": "./src/solid/index.ts",
+    "./react": "./src/react/index.ts",
     "./styles.css": "./src/shop.css"
   },
   "files": [
@@ -32,16 +35,40 @@
     "*.css"
   ],
   "scripts": {
-    "typecheck": "tsc --noEmit",
+    "check": "bun run typecheck && bun test",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.solid.json && tsc --noEmit -p tsconfig.react.json",
     "test": "bun test"
   },
   "peerDependencies": {
+    "@solidjs/web": ">=2.0.0",
     "@ui-sdk/core": "0.1.0-beta.5",
-    "@ui-sdk/web": "0.1.0-beta.5"
+    "@ui-sdk/react": "0.1.0-beta.5",
+    "@ui-sdk/solid": "0.1.0-beta.5",
+    "@ui-sdk/web": "0.1.0-beta.5",
+    "react": ">=19.0.0",
+    "react-dom": ">=19.0.0",
+    "solid-js": ">=2.0.0"
+  },
+  "peerDependenciesMeta": {
+    "@solidjs/web": { "optional": true },
+    "@ui-sdk/react": { "optional": true },
+    "@ui-sdk/solid": { "optional": true },
+    "@ui-sdk/web": { "optional": true },
+    "react": { "optional": true },
+    "react-dom": { "optional": true },
+    "solid-js": { "optional": true }
   },
   "devDependencies": {
+    "@solidjs/web": "2.0.3",
+    "@types/react": "^19.2.10",
+    "@types/react-dom": "^19.2.10",
     "@ui-sdk/core": "0.1.0-beta.5",
+    "@ui-sdk/react": "0.1.0-beta.5",
+    "@ui-sdk/solid": "0.1.0-beta.5",
     "@ui-sdk/web": "0.1.0-beta.5",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "solid-js": "2.0.3",
     "typescript": "^5.9.3"
   }
 }

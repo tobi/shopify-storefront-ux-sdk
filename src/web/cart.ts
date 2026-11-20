@@ -10,6 +10,8 @@ type Field = HTMLElement & { value: number | null }
 type CartInstanceApi = {
   setQuantity: (line: string, quantity: number, details?: { reason?: "press" | "input"; event?: Event }) => Promise<unknown>
   remove: (line: string, details?: { reason?: "press" | "input"; event?: Event }) => Promise<unknown>
+  removeDiscount: (code: string, details?: { event?: Event }) => Promise<unknown>
+  setNote: (note: string, details?: { event?: Event }) => Promise<unknown>
 }
 
 const lineName = (line: { title: string; variantTitle: string }) =>
@@ -37,7 +39,15 @@ function renderLines(host: HTMLElement, cart: Cart | null, api: CartInstanceApi,
   const lines = cart?.lines ?? []
   const signature = JSON.stringify([
     limit,
-    lines.map((line) => [line.id, line.quantity, line.price.amount, line.priceChangedFrom, line.image?.url, line.bundle]),
+    lines.map((line) => [
+      line.id,
+      line.quantity,
+      line.cost.totalAmount.amount,
+      line.cost.totalAmount.currencyCode,
+      line.priceChangedFrom,
+      line.image?.url,
+      line.bundle,
+    ]),
   ])
   const memo = rendered.get(host) ?? { signature: "", off: [] }
   rendered.set(host, memo)
@@ -51,7 +61,8 @@ function renderLines(host: HTMLElement, cart: Cart | null, api: CartInstanceApi,
   const hadFocus = Boolean(active && list.contains(active))
 
   for (const dispose of memo.off.splice(0)) dispose()
-  const rows = cloneEach(host, lines, (row, line) => fillLine(row, line, limit))
+  const hrefPattern = host.getAttribute("product-href") ?? "#/products/{handle}"
+  const rows = cloneEach(host, lines, (row, line) => fillLine(row, line, limit, hrefPattern))
   list.replaceChildren(...rows)
 
   rows.forEach((row, index) => {
@@ -94,7 +105,7 @@ function renderLines(host: HTMLElement, cart: Cart | null, api: CartInstanceApi,
   if (target && target !== document.activeElement) target.focus()
 }
 
-function fillLine(row: HTMLElement, line: CartLine, limit: number) {
+function fillLine(row: HTMLElement, line: CartLine, limit: number, hrefPattern: string) {
   const lastOne = line.quantity === 1
   row.dataset.lineId = line.id
   row.toggleAttribute("data-last-one", lastOne)
@@ -111,6 +122,10 @@ function fillLine(row: HTMLElement, line: CartLine, limit: number) {
     }
   }
   setText(row.querySelector("[data-shop-line-title]"), line.title)
+  const link = row.querySelector<HTMLAnchorElement>("[data-shop-line-link]")
+  if (link && line.handle) {
+    link.href = hrefPattern.replace("{handle}", encodeURIComponent(line.handle))
+  }
   const variant = row.querySelector<HTMLElement>("[data-shop-line-variant]")
   if (variant) {
     setText(variant, line.variantTitle)
@@ -121,10 +136,7 @@ function fillLine(row: HTMLElement, line: CartLine, limit: number) {
     setText(bundle, line.bundle ? `Part of ${line.bundle}` : "")
     bundle.hidden = !line.bundle
   }
-  setText(
-    row.querySelector("[data-shop-line-price]"),
-    money({ amount: String(Number(line.price.amount) * line.quantity), currencyCode: line.price.currencyCode }),
-  )
+  setText(row.querySelector("[data-shop-line-price]"), money(line.cost.totalAmount))
   const notice = row.querySelector<HTMLElement>("[data-shop-line-notice]")
   if (notice) {
     setText(
@@ -207,7 +219,12 @@ function renderShipping(el: HTMLElement, cart: Cart | null) {
   unlocked.set(el, reached)
 }
 
-function renderDiscount(el: HTMLElement, cart: Cart | null, discount: { status: string; message: string }) {
+function renderDiscount(
+  el: HTMLElement,
+  cart: Cart | null,
+  discount: { status: string; message: string },
+  api: CartInstanceApi,
+) {
   setText(el.querySelector("[data-shop-discount-status]"), discount.message)
   const button = el.querySelector<HTMLButtonElement>('button[type="submit"]')
   if (button) button.disabled = discount.status === "pending"
@@ -225,15 +242,35 @@ function renderDiscount(el: HTMLElement, cart: Cart | null, discount: { status: 
       row.dataset.code = entry.code
       setText(row.querySelector("[data-shop-discount-code]"), entry.code)
       setText(row.querySelector("[data-shop-discount-note]"), entry.applicable ? "" : "not applicable")
+      const remove = row.querySelector<HTMLButtonElement>("[data-shop-discount-remove]")
+      if (remove) {
+        remove.setAttribute("aria-label", `Remove discount ${entry.code}`)
+        remove.addEventListener("click", (event) => {
+          void api.removeDiscount(entry.code, { event })
+        })
+      }
     }),
   )
 }
+
+const noteBound = new WeakSet<HTMLElement>()
 
 const parts = createParts(shopCart, {
   root: {
     tag: "shop-cart",
     display: "block",
-    api: ["getCart", "getCount", "add", "setQuantity", "remove", "restore", "applyDiscount", "refresh"],
+    api: [
+      "getCart",
+      "getCount",
+      "add",
+      "setQuantity",
+      "remove",
+      "restore",
+      "applyDiscount",
+      "removeDiscount",
+      "setNote",
+      "refresh",
+    ],
     // Content is text the parts can't hold as attributes: written here, from state.
     render(el, instance) {
       const paint = () => {
@@ -261,7 +298,27 @@ const parts = createParts(shopCart, {
         for (const total of el.querySelectorAll<HTMLElement>("shop-cart-total")) renderTotal(total, cart)
         for (const shipping of el.querySelectorAll<HTMLElement>("shop-cart-shipping")) renderShipping(shipping, cart)
         for (const discount of el.querySelectorAll<HTMLElement>("shop-cart-discount")) {
-          renderDiscount(discount, cart, state.discount)
+          renderDiscount(discount, cart, state.discount, instance.api)
+        }
+        for (const notePart of el.querySelectorAll<HTMLElement>("shop-cart-note")) {
+          const input = notePart.querySelector<HTMLTextAreaElement | HTMLInputElement>("textarea, input")
+          if (input) {
+            if (!noteBound.has(input)) {
+              noteBound.add(input)
+              input.addEventListener("change", (event) => {
+                void instance.api.setNote(input.value, { event }).catch(() => {})
+              })
+            }
+            if (document.activeElement !== input && input.value !== (cart?.note ?? "")) {
+              input.value = cart?.note ?? ""
+            }
+          }
+        }
+        for (const pay of el.querySelectorAll<HTMLElement & { checkoutUrl?: string; disabled?: boolean }>(
+          "shop-pay[data-cart-pay]",
+        )) {
+          pay.checkoutUrl = cart?.checkoutUrl ?? ""
+          pay.disabled = empty
         }
         // Read again: rendering can announce, like a crossed shipping threshold.
         const { message } = instance.get()
@@ -280,6 +337,7 @@ const parts = createParts(shopCart, {
   total: { tag: "shop-cart-total", display: "block" },
   shipping: { tag: "shop-cart-shipping", display: "block" },
   discount: { tag: "shop-cart-discount", display: "block" },
+  note: { tag: "shop-cart-note", display: "block" },
   checkout: { tag: "shop-cart-checkout", display: "contents", target: wrappedButton },
   status: { tag: "shop-cart-status", display: "block" },
 })
