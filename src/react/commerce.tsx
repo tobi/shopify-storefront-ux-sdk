@@ -179,6 +179,7 @@ function ShopPromise({
 
 function ShopMarketSelector({
   endpoint,
+  mode,
   storageKey,
   countries,
   country,
@@ -187,12 +188,13 @@ function ShopMarketSelector({
   defaultLanguage,
   onCountryChange,
   onLanguageChange,
-  label = "Country and currency",
+  label,
   ...rest
 }: ShopMarketSelectorOptions & { label?: string } & Omit<PartProps<"div", ShopMarketSelectorState>, "children">) {
   const cart = useCart()
   const handle = usePrimitive(shopMarketSelector, {
     endpoint: endpoint ?? cart.endpoint,
+    mode,
     storageKey,
     countries,
     country,
@@ -210,8 +212,9 @@ function ShopMarketSelector({
       ...rest,
       children: (state: ShopMarketSelectorState) => (
         <select
-          aria-label={label}
-          value={state.country}
+          aria-label={label ?? (state.mode === "country" ? "Country and currency" : "Currency")}
+          disabled={state.choices.length <= 1}
+          value={state.selectedValue}
           onChange={(event) =>
             handle.api.setCountry(event.currentTarget.value, {
               reason: "input",
@@ -219,14 +222,14 @@ function ShopMarketSelector({
             })
           }
         >
-          {state.countries.length > 0 ? (
-            state.countries.map((entry) => (
-              <option key={entry.isoCode} value={entry.isoCode}>
-                {entry.name} ({entry.currency.isoCode} {entry.currency.symbol})
+          {state.choices.length > 0 ? (
+            state.choices.map((choice) => (
+              <option key={choice.value} value={choice.value}>
+                {choice.label}
               </option>
             ))
           ) : (
-            <option value={state.country}>{state.country}</option>
+            <option value={state.country}>{state.currency || state.country}</option>
           )}
         </select>
       ),

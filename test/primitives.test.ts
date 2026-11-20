@@ -337,7 +337,24 @@ describe("shop-market-selector", () => {
     cancel = false
     expect(market.api.setCountry("DE")).toBe(true)
     expect(market.api.getMarket()).toMatchObject({ country: "DE", currency: "EUR", symbol: "€", hasMultipleCurrencies: true })
+    expect(market.api.getChoices().map((c) => c.label)).toEqual(["USD $", "CAD $", "EUR €"])
     expect(shopConfig().country).toBe("DE")
+
+    // Single-currency store collapses to one currency option in currency mode, keeps all in country mode.
+    const usdOnly = shopMarketSelector({
+      id: "usd-only",
+      countries: [
+        { isoCode: "AC", name: "Ascension Island", currency: { isoCode: "USD", symbol: "$" } },
+        { isoCode: "CA", name: "Canada", currency: { isoCode: "USD", symbol: "$" } },
+        { isoCode: "US", name: "United States", currency: { isoCode: "USD", symbol: "$" } },
+      ],
+      defaultCountry: "CA",
+    })
+    expect(usdOnly.api.getMarket().hasMultipleCurrencies).toBe(false)
+    expect(usdOnly.api.getChoices().map((c) => c.label)).toEqual(["USD $"])
+    usdOnly.setOptions({ mode: "country" })
+    expect(usdOnly.api.getChoices()).toHaveLength(3)
+    usdOnly.destroy()
 
     // Re-syncing shopCart with unchanged options (like a React re-render) must not clobber the market choice.
     const cartInstance = shopCart({ id: "cart-mkt", country: "CA", language: "en" })

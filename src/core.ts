@@ -128,6 +128,8 @@ export {
 export {
   shopMarketSelector,
   type MarketChangeReason,
+  type MarketChoice,
+  type MarketSelectorMode,
   type MarketStatus,
   type ShopMarketSelectorOptions,
   type ShopMarketSelectorState,

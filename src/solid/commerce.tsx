@@ -192,6 +192,7 @@ function ShopMarketSelector(
   const cart = useCart()
   const handle = usePrimitive(shopMarketSelector, () => ({
     endpoint: props.endpoint ?? cart.endpoint(),
+    mode: props.mode,
     storageKey: props.storageKey,
     countries: props.countries,
     country: props.country,
@@ -204,6 +205,7 @@ function ShopMarketSelector(
   const rest = omit(
     props,
     "endpoint",
+    "mode",
     "storageKey",
     "countries",
     "country",
@@ -222,8 +224,9 @@ function ShopMarketSelector(
       ...rest,
       children: (state: ShopMarketSelectorState) => (
         <select
-          aria-label={props.label ?? "Country and currency"}
-          value={state.country}
+          aria-label={props.label ?? (state.mode === "country" ? "Country and currency" : "Currency")}
+          disabled={state.choices.length <= 1}
+          value={state.selectedValue}
           onChange={(event) =>
             handle.api.setCountry((event.currentTarget as HTMLSelectElement).value, {
               reason: "input",
@@ -232,13 +235,13 @@ function ShopMarketSelector(
           }
         >
           <Show
-            when={state.countries.length > 0}
-            fallback={<option value={state.country}>{state.country}</option>}
+            when={state.choices.length > 0}
+            fallback={<option value={state.country}>{state.currency || state.country}</option>}
           >
-            <For each={state.countries} keyed={(country) => country.isoCode}>
-              {(country) => (
-                <option value={country().isoCode} selected={country().isoCode === state.country}>
-                  {country().name} ({country().currency.isoCode} {country().currency.symbol})
+            <For each={state.choices} keyed={(choice) => choice.value}>
+              {(choice) => (
+                <option value={choice().value} selected={choice().value === state.selectedValue}>
+                  {choice().label}
                 </option>
               )}
             </For>

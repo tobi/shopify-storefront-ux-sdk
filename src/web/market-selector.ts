@@ -6,10 +6,10 @@ const parts = createParts(shopMarketSelector, {
   root: {
     tag: "shop-market-selector",
     display: "block",
-    api: ["getMarket", "getCountries", "setCountry", "setLanguage", "refresh"],
+    api: ["getMarket", "getCountries", "getChoices", "setCountry", "setLanguage", "refresh"],
     render(el, instance) {
       const select = el.querySelector<HTMLSelectElement>("select")
-      let lastCountries = ""
+      let lastChoices = ""
 
       const onChange = (event: Event) => {
         const value = (event.target as HTMLSelectElement).value
@@ -19,22 +19,23 @@ const parts = createParts(shopMarketSelector, {
 
       const paint = () => {
         const market = instance.api.getMarket()
-        setText(el.querySelector("[data-market-label]"), market.currency ? `${market.country} · ${market.currency}` : market.country)
+        setText(el.querySelector("[data-market-label]"), market.currency ? `${market.currency} ${market.symbol}`.trim() : market.country)
         setText(el.querySelector("[data-market-currency]"), market.currency)
         if (!select) return
-        const sig = market.countries.map((c) => `${c.isoCode}:${c.currency.isoCode}`).join(",")
-        if (sig !== lastCountries && market.countries.length) {
-          lastCountries = sig
+        const sig = market.choices.map((c) => `${c.value}:${c.label}`).join("|")
+        if (sig !== lastChoices && market.choices.length) {
+          lastChoices = sig
           select.replaceChildren(
-            ...market.countries.map((c) => {
+            ...market.choices.map((c) => {
               const option = document.createElement("option")
-              option.value = c.isoCode
-              option.textContent = `${c.name} (${c.currency.isoCode} ${c.currency.symbol})`
+              option.value = c.value
+              option.textContent = c.label
               return option
             }),
           )
         }
-        if (select.value !== market.country) select.value = market.country
+        select.disabled = market.choices.length <= 1
+        if (select.value !== market.selectedValue) select.value = market.selectedValue
       }
 
       paint()

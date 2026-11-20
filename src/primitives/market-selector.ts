@@ -10,10 +10,17 @@ import {
 } from "../shop"
 
 type MarketChangeReason = "input" | "item-press" | "imperative"
+type MarketSelectorMode = "currency" | "country"
 
 type ShopMarketSelectorOptions = {
   /** Storefront API URL. Defaults to the configured shop endpoint. */
   endpoint?: string
+  /**
+   * `"currency"` (default) deduplicates markets by currency so single-currency
+   * stores only show that currency (e.g. `USD $`), while multi-currency stores
+   * show one clean choice per currency. `"country"` lists every shipping country.
+   */
+  mode?: MarketSelectorMode
   /** Optional localStorage key to persist the shopper's chosen market across reloads. */
   storageKey?: string
   /** Optional explicit list of countries (skips network fetch if provided). */
@@ -30,7 +37,16 @@ type ShopMarketSelectorOptions = {
 
 type MarketStatus = "loading" | "idle" | "error"
 
+type MarketChoice = {
+  /** Country ISO code sent to `@inContext(country)`. */
+  value: string
+  /** Display label ("USD $" in currency mode, "Canada (CAD $)" in country mode). */
+  label: string
+  country: MarketCountry
+}
+
 type State = {
+  mode: MarketSelectorMode
   country: string
   language: string
   countries: MarketCountry[]
@@ -39,6 +55,7 @@ type State = {
 }
 
 type ShopMarketSelectorState = {
+  mode: MarketSelectorMode
   country: string
   language: string
   currency: string
@@ -47,7 +64,32 @@ type ShopMarketSelectorState = {
   hasMultipleCurrencies: boolean
   status: MarketStatus
   countries: MarketCountry[]
+  /** Deduplicated currency choices (in `currency` mode) or full country list (in `country` mode). */
+  choices: MarketChoice[]
+  /** The `value` matching the active option in `choices`. */
+  selectedValue: string
   languages: MarketLanguage[]
+}
+
+/** Preferred representative country when deduplicating by currency. */
+const canonicalCountry: Record<string, string> = {
+  USD: "US",
+  CAD: "CA",
+  GBP: "GB",
+  EUR: "DE",
+  AUD: "AU",
+  NZD: "NZ",
+  JPY: "JP",
+  CHF: "CH",
+  SEK: "SE",
+  NOK: "NO",
+  DKK: "DK",
+  MXN: "MX",
+  BRL: "BR",
+  INR: "IN",
+  SGD: "SG",
+  HKD: "HK",
+  KRW: "KR",
 }
 
 const currentCountryOf = (state: State) =>
@@ -56,9 +98,46 @@ const currentCountryOf = (state: State) =>
 const hasMultipleCurrenciesOf = (countries: readonly MarketCountry[]) =>
   new Set(countries.map((c) => c.currency.isoCode)).size > 1
 
+function choicesOfMarket(state: State): MarketChoice[] {
+  if (state.mode === "country") {
+    return state.countries.map((country) => ({
+      value: country.isoCode,
+      label: `${country.name} (${country.currency.isoCode} ${country.currency.symbol})`,
+      country,
+    }))
+  }
+  const byCurrency = new Map<string, MarketCountry>()
+  const activeIso = state.country.toUpperCase()
+  for (const country of state.countries) {
+    const code = country.currency.isoCode
+    const existing = byCurrency.get(code)
+    if (!existing) {
+      byCurrency.set(code, country)
+      continue
+    }
+    const iso = country.isoCode.toUpperCase()
+    if (iso === activeIso) {
+      byCurrency.set(code, country)
+    } else if (existing.isoCode.toUpperCase() !== activeIso && canonicalCountry[code] === iso) {
+      byCurrency.set(code, country)
+    }
+  }
+  return [...byCurrency.values()].map((country) => ({
+    value: country.isoCode,
+    label: `${country.currency.isoCode} ${country.currency.symbol}`.trim(),
+    country,
+  }))
+}
+
 const marketState = (state: State): ShopMarketSelectorState => {
   const active = currentCountryOf(state)
+  const choices = choicesOfMarket(state)
+  const selected =
+    choices.find((c) => c.value.toUpperCase() === state.country.toUpperCase()) ??
+    choices.find((c) => active && c.country.currency.isoCode === active.currency.isoCode) ??
+    choices[0]
   return {
+    mode: state.mode,
     country: state.country,
     language: state.language,
     currency: active?.currency.isoCode ?? "",
@@ -67,6 +146,8 @@ const marketState = (state: State): ShopMarketSelectorState => {
     hasMultipleCurrencies: hasMultipleCurrenciesOf(state.countries),
     status: state.status,
     countries: state.countries,
+    choices,
+    selectedValue: selected?.value ?? state.country,
     languages: active?.availableLanguages ?? [],
   }
 }
@@ -95,15 +176,16 @@ function writeStoredMarket(storageKey: string | undefined, value: { country: str
 /**
  * Market / currency / language selector backed by Shopify's `localization` API.
  *
- * Switching country updates `configureShop({ country, language })`, which
- * updates `@inContext` for all subsequent Storefront queries, updates the live
- * cart's `buyerIdentity`, and triggers active catalogs/products to re-fetch in
- * the newly selected currency.
+ * Defaults to `mode: "currency"`, deduplicating countries by currency so a
+ * single-currency store cleanly shows only that currency (e.g. `USD $`) instead
+ * of hundreds of identical-currency countries. Pass `mode: "country"` for a full
+ * shipping-country picker.
  */
 const shopMarketSelector = definePrimitive({
   name: "shop-market-selector",
   options: {
     endpoint: "string",
+    mode: "string",
     storageKey: "string",
     countries: "value",
     country: "string",
@@ -121,6 +203,7 @@ const shopMarketSelector = definePrimitive({
     const country = (options.country ?? saved?.country ?? options.defaultCountry ?? cfg.country).toUpperCase()
     const language = (options.language ?? saved?.language ?? options.defaultLanguage ?? cfg.language).toUpperCase()
     return {
+      mode: options.mode === "country" ? "country" : "currency",
       country,
       language,
       countries,
@@ -129,6 +212,7 @@ const shopMarketSelector = definePrimitive({
     }
   },
   sync: (options: ShopMarketSelectorOptions) => ({
+    ...(options.mode === undefined ? {} : { mode: options.mode === "country" ? ("country" as const) : ("currency" as const) }),
     ...(options.countries ? { countries: options.countries, status: "idle" as const } : {}),
     ...(options.country === undefined ? {} : { country: options.country.toUpperCase() }),
     ...(options.language === undefined ? {} : { language: options.language.toUpperCase() }),
@@ -190,6 +274,7 @@ const shopMarketSelector = definePrimitive({
     return {
       getMarket: () => marketState(store.get()),
       getCountries: () => store.get().countries,
+      getChoices: () => choicesOfMarket(store.get()),
       setCountry: (isoCode: string, details: { reason?: MarketChangeReason; event?: Event } = {}) => {
         const next = isoCode.trim().toUpperCase()
         if (!next) return false
@@ -225,7 +310,8 @@ const shopMarketSelector = definePrimitive({
       role: "group",
       state: marketState,
       attrs: (state) => ({
-        "aria-label": "Country and currency",
+        "aria-label": state.mode === "country" ? "Country and currency" : "Currency",
+        "data-mode": state.mode,
         "data-country": state.country,
         "data-currency": currentCountryOf(state)?.currency.isoCode,
         "data-multi-currency": hasMultipleCurrenciesOf(state.countries) ? "" : undefined,
@@ -239,6 +325,8 @@ const shopMarketSelector = definePrimitive({
 export {
   shopMarketSelector,
   type MarketChangeReason,
+  type MarketChoice,
+  type MarketSelectorMode,
   type MarketStatus,
   type ShopMarketSelectorOptions,
   type ShopMarketSelectorState,
