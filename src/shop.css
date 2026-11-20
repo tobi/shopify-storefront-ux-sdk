@@ -1,0 +1,1004 @@
+/* Shop components: cart lines, summary and status. Page layout is yours. */
+
+shop-cart,
+shop-product,
+/* Focus. Never the browser's rectangle: keyboard focus gets one ring, drawn
+   with box-shadow so it follows the control's own shape, and a field rings
+   the control it sits in, like a quantity stepper's pill, not the bare
+   <input>. A pointer press on a button shows nothing. */
+:root {
+  --shop-focus-color: color-mix(in oklab, #1b1d21 55%, transparent);
+  --shop-focus-ring: 0 0 0 2px var(--shop-focus-gap, #fffdf8), 0 0 0 4px var(--shop-focus-color);
+}
+
+:where(
+  shop-cart, shop-product, shop-bundle, shop-product-media, shop-variant-selector,
+  shop-store-picker, ui-dialog-content, ui-drawer-content
+) :focus,
+ui-dialog-content:focus,
+ui-drawer-content:focus,
+ui-carousel-viewport:focus,
+ui-radio:focus,
+ui-checkbox:focus {
+  outline: none;
+}
+
+ui-number-input-control input:focus,
+ui-number-input-control input:focus-visible {
+  outline: none;
+  box-shadow: none;
+}
+
+ui-number-input-group:has(input:focus-visible),
+shop-variant-option label:has(ui-radio:focus-visible),
+ui-segmented-control-item:focus-visible,
+ui-carousel-viewport:focus-visible {
+  outline: none;
+  box-shadow: var(--shop-focus-ring);
+}
+
+ui-carousel-viewport:focus-visible {
+  border-radius: 10px;
+}
+
+ui-radio:focus-visible,
+ui-checkbox:focus-visible {
+  box-shadow: none;
+}
+
+shop-cart-lines,
+shop-cart-summary,
+shop-cart-total,
+shop-cart-empty,
+shop-cart-shipping,
+shop-cart-discount,
+shop-cart-status {
+  --shop-bg: #f6f3ec;
+  --shop-surface: #fffdf8;
+  --shop-ink: #1b1d21;
+  --shop-muted: #5c6169;
+  --shop-line: #e0dbd0;
+  --shop-accent: #21372a;
+  --shop-accent-ink: #f6f3ec;
+  --shop-danger: #8c2f2f;
+  --shop-radius: 999px;
+}
+
+shop-cart-lines,
+shop-cart-summary,
+shop-cart-total,
+shop-cart-empty,
+shop-cart-shipping,
+shop-cart-discount,
+shop-cart-status {
+  display: block;
+  color: var(--shop-ink);
+  font-family: var(--shop-font, ui-sans-serif, system-ui, sans-serif);
+}
+
+.shop-empty {
+  margin: 6px 0;
+  max-width: 32ch;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--shop-muted);
+}
+
+.shop-lines {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.shop-line {
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: start;
+}
+
+.shop-line-image {
+  display: block;
+  width: 64px;
+  height: 80px;
+  overflow: hidden;
+  border-radius: calc(var(--shop-radius) / 3);
+  background: color-mix(in oklab, var(--shop-line) 60%, transparent);
+}
+
+/* The image carries Shopify's intrinsic size for its aspect ratio: fit it to the box. */
+.shop-line-image img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.shop-line-title {
+  margin: 0;
+  font-size: 13.5px;
+  font-weight: 500;
+  color: var(--shop-ink);
+}
+
+.shop-line-variant {
+  margin: 2px 0 8px;
+  font-size: 12px;
+  color: var(--shop-muted);
+}
+
+/* A price the cart remembers differently from today's: quiet, not alarming. */
+.shop-line-notice {
+  margin: -4px 0 8px;
+  font-size: 11.5px;
+  color: var(--shop-muted);
+}
+
+.shop-line[data-price-changed] .shop-line-price {
+  color: var(--shop-danger);
+}
+
+/* Beside the template, not inside it: one for the list, not one per line. */
+.shop-undo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 14px;
+  padding: 8px 12px;
+  border: 1px solid var(--shop-line);
+  border-radius: var(--shop-radius);
+  background: var(--shop-surface);
+  font-size: 12px;
+  color: var(--shop-muted);
+}
+
+.shop-undo::before {
+  content: "Removed from your bag.";
+}
+
+.shop-undo-button {
+  margin-left: auto;
+  padding: 4px 12px;
+  border: 0;
+  border-radius: var(--shop-radius);
+  background: color-mix(in oklab, var(--shop-ink) 8%, transparent);
+  color: var(--shop-ink);
+  font: inherit;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.shop-undo-button:hover {
+  background: color-mix(in oklab, var(--shop-ink) 16%, transparent);
+}
+
+.shop-undo-button:focus-visible {
+  outline: none;
+  box-shadow: var(--shop-focus-ring);
+}
+
+.shop-line-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.shop-line-controls ui-number-input-group {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--shop-line);
+  border-radius: var(--shop-radius);
+  background: var(--shop-surface);
+  overflow: hidden;
+}
+
+.shop-line-controls ui-number-input-decrement,
+.shop-line-controls ui-number-input-increment {
+  display: contents;
+}
+
+.shop-line-controls button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--shop-ink);
+  font: inherit;
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.shop-line-controls button:hover:not(:disabled) {
+  background: color-mix(in oklab, var(--shop-ink) 8%, transparent);
+}
+
+.shop-line-controls button:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.shop-line-controls ui-number-input-control {
+  display: flex;
+}
+
+.shop-line-controls input {
+  width: 30px;
+  border: 0;
+  background: none;
+  text-align: center;
+  font-family: var(--shop-mono, ui-monospace, monospace);
+  font-size: 12px;
+  color: var(--shop-ink);
+  appearance: textfield;
+}
+
+.shop-line-controls button:focus-visible,
+.shop-checkout:focus-visible {
+  outline: none;
+  box-shadow: var(--shop-focus-ring);
+}
+
+.shop-bin {
+  display: block;
+  pointer-events: none;
+}
+
+/* `hidden` is an HTML attribute: an SVG inside the button ignores it, so the
+   bin and the minus take turns by CSS instead. */
+.shop-bin[hidden],
+[data-shop-minus][hidden] {
+  display: none;
+}
+
+.shop-line-controls button[data-step="dec"]:has(.shop-bin:not([hidden])) {
+  cursor: pointer;
+  color: var(--shop-danger);
+}
+
+.shop-line-controls button[data-step="dec"]:has(.shop-bin:not([hidden])):hover {
+  background: color-mix(in oklab, var(--shop-danger) 12%, transparent);
+}
+
+.shop-line-price {
+  font-family: var(--shop-mono, ui-monospace, monospace);
+  font-size: 12.5px;
+  color: var(--shop-ink);
+  white-space: nowrap;
+}
+
+.shop-total {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 6px;
+  font-family: var(--shop-mono, ui-monospace, monospace);
+  font-size: 13px;
+  color: var(--shop-ink);
+}
+
+/* Free shipping: the bar reads --shop-shipping-progress, 0 to 1. */
+.shop-shipping {
+  margin: 0 0 8px;
+  font-size: 12px;
+  color: var(--shop-muted);
+}
+
+.shop-shipping-bar {
+  display: block;
+  position: relative;
+  height: 4px;
+  margin-bottom: 14px;
+  border-radius: var(--shop-radius);
+  background: color-mix(in oklab, var(--shop-line) 70%, transparent);
+  overflow: hidden;
+}
+
+.shop-shipping-bar::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  width: calc(var(--shop-shipping-progress, 0) * 100%);
+  border-radius: inherit;
+  background: var(--shop-accent);
+  transition: width 240ms ease;
+}
+
+shop-cart-shipping[data-unlocked] .shop-shipping {
+  color: var(--shop-accent);
+}
+
+/* Discount codes: the form the cart fills, the codes the cart reports. */
+.shop-discount {
+  margin-bottom: 14px;
+}
+
+.shop-discount-label {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 11.5px;
+  color: var(--shop-muted);
+}
+
+.shop-discount-row {
+  display: flex;
+  gap: 8px;
+}
+
+.shop-discount-row input {
+  flex: 1;
+  min-width: 0;
+  padding: 8px 12px;
+  border: 1px solid var(--shop-line);
+  border-radius: var(--shop-radius);
+  background: var(--shop-surface);
+  color: var(--shop-ink);
+  font: inherit;
+  font-size: 12.5px;
+}
+
+.shop-discount-row input:focus-visible,
+.shop-discount-apply:focus-visible {
+  outline: none;
+  box-shadow: var(--shop-focus-ring);
+}
+
+.shop-discount-apply {
+  padding: 8px 14px;
+  border: 1px solid var(--shop-line);
+  border-radius: var(--shop-radius);
+  background: var(--shop-surface);
+  color: var(--shop-ink);
+  font: inherit;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+
+.shop-discount[data-busy] .shop-discount-apply {
+  opacity: 0.5;
+  cursor: progress;
+}
+
+.shop-discount[data-applied] .shop-discount-row input {
+  border-color: var(--shop-accent);
+}
+
+.shop-discount[data-error] .shop-discount-row input {
+  border-color: var(--shop-danger);
+}
+
+.shop-discount-status {
+  margin: 6px 0 0;
+  min-height: 1.2em;
+  font-size: 11.5px;
+  color: var(--shop-muted);
+}
+
+.shop-discount[data-error] .shop-discount-status {
+  color: var(--shop-danger);
+}
+
+.shop-discount-applied {
+  list-style: none;
+  margin: 6px 0 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.shop-discount-code {
+  display: inline-flex;
+  gap: 6px;
+  align-items: baseline;
+  padding: 3px 10px;
+  border: 1px solid var(--shop-line);
+  border-radius: var(--shop-radius);
+  font-family: var(--shop-mono, ui-monospace, monospace);
+  font-size: 11.5px;
+  color: var(--shop-ink);
+}
+
+.shop-discount-note {
+  font-family: var(--shop-font, ui-sans-serif, system-ui, sans-serif);
+  color: var(--shop-muted);
+}
+
+.shop-note {
+  margin: 0 0 13px;
+  font-size: 11.5px;
+  color: var(--shop-muted);
+}
+
+.shop-checkout {
+  display: block;
+  padding: 12px;
+  border-radius: var(--shop-radius);
+  background: var(--shop-accent);
+  color: var(--shop-accent-ink);
+  font-size: 14px;
+  text-align: center;
+  text-decoration: none;
+}
+
+.shop-checkout:hover {
+  background: color-mix(in oklab, var(--shop-accent) 88%, black);
+}
+
+.shop-checkout[aria-disabled="true"] {
+  opacity: 0.4;
+  pointer-events: none;
+}
+
+shop-cart-status {
+  min-height: 1.2em;
+  font-size: 12px;
+  color: var(--shop-muted);
+}
+
+/* A cart page: the totals a bag really has, and an empty state with a shape. */
+.shop-total-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  margin-bottom: 6px;
+  font-family: var(--shop-mono, ui-monospace, monospace);
+  font-size: 13px;
+  color: var(--shop-ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.shop-total-grand {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--shop-line);
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--shop-ink);
+}
+
+.shop-discount-lines {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.shop-discount-line {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-family: var(--shop-mono, ui-monospace, monospace);
+  font-size: 12.5px;
+  color: var(--shop-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.shop-cart-empty {
+  display: grid;
+  justify-items: center;
+  gap: 14px;
+  padding: 64px 24px;
+  border: 1px dashed var(--shop-line);
+  border-radius: calc(var(--shop-radius) / 2);
+  background: var(--shop-surface);
+  text-align: center;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--shop-muted);
+}
+
+.shop-cart-empty [data-shop-empty-text] {
+  max-width: 34ch;
+  margin: 0;
+}
+
+.shop-cart-empty [data-shop-empty-links] {
+  margin: 0;
+  font-size: 13px;
+}
+
+/* `display` above is the author's, so `hidden` needs saying here too. */
+.shop-cart-empty[hidden],
+.shop-cart-empty [hidden] {
+  display: none;
+}
+
+/* Text only a screen reader needs, like "sold out" after a value. */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ------------------------------------------------------------ product media
+   The SDK carousel scrolls and snaps natively; slides are one to a view.
+   Every image box keeps its shape before its pixels arrive. */
+
+shop-product-media {
+  position: relative;
+  --shop-media-ratio: 4 / 5;
+  --shop-media-surface: #edece8;
+}
+
+shop-product-media .media-main {
+  position: relative;
+  display: block;
+}
+
+shop-product-media .media-viewport {
+  border-radius: 10px;
+  scrollbar-width: none;
+}
+
+shop-product-media .media-viewport::-webkit-scrollbar {
+  display: none;
+}
+
+shop-product-media .media-track {
+  display: flex;
+}
+
+shop-product-media .media-slide {
+  flex: 0 0 100%;
+  min-width: 0;
+}
+
+shop-product-media .media-open {
+  display: block;
+  position: relative;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: zoom-in;
+}
+
+shop-product-media .media-frame {
+  position: relative;
+  aspect-ratio: var(--shop-media-ratio);
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--shop-media-surface);
+}
+
+shop-product-media .media-image {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transform-origin: var(--shop-media-x, 50%) var(--shop-media-y, 50%);
+  transition: transform 220ms ease;
+}
+
+shop-product-media .media-open:focus-visible {
+  outline: none;
+  box-shadow: var(--shop-focus-ring);
+  border-radius: 12px;
+}
+
+/* Zoom only for a fine pointer that can hover, and only when asked for. */
+@media (hover: hover) and (pointer: fine) {
+  shop-product-media[data-hover-zoom] .media-frame[data-zooming] .media-image {
+    transform: scale(var(--shop-media-zoom, 2));
+  }
+}
+
+shop-product-media:not([data-hover-zoom]) .media-hint-zoom {
+  display: none;
+}
+
+@media (hover: none), (pointer: coarse) {
+  shop-product-media .media-hint-zoom {
+    display: none;
+  }
+}
+
+.media-hint {
+  position: absolute;
+  inset: auto 12px 12px auto;
+  padding: 7px 11px;
+  border-radius: 999px;
+  background: rgb(255 255 255 / 88%);
+  color: #292b2d;
+  font: 11px system-ui, sans-serif;
+  pointer-events: none;
+  transition: opacity 160ms ease;
+}
+
+shop-product-media .media-frame[data-zooming] + .media-hint {
+  opacity: 0;
+}
+
+shop-product-media .media-step {
+  position: absolute;
+  top: calc(50% - 46px);
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: 1px solid rgb(255 255 255 / 40%);
+  border-radius: 50%;
+  background: rgb(255 255 255 / 82%);
+  color: #262c28;
+  box-shadow: 0 4px 14px rgb(0 0 0 / 10%);
+  cursor: pointer;
+  transition: opacity 160ms ease, background 160ms ease;
+}
+
+shop-product-media .media-previous {
+  left: 10px;
+}
+
+shop-product-media .media-next {
+  right: 10px;
+}
+
+shop-product-media .media-step:hover {
+  background: #fff;
+}
+
+shop-product-media .media-step:focus-visible {
+  outline: none;
+  box-shadow: var(--shop-focus-ring);
+}
+
+shop-product-media[data-single] .media-step,
+shop-product-media[data-single] .thumbs,
+shop-product-media[data-single] .image-control:not(.image-close),
+shop-product-media[data-single] .image-filmstrip {
+  display: none;
+}
+
+shop-product-media .thumbs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+shop-product-media .thumb,
+.image-film-thumb {
+  display: block;
+  width: 54px;
+  aspect-ratio: var(--shop-media-ratio, 4 / 5);
+  padding: 2px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  background: var(--shop-media-surface, #efefeb);
+  opacity: 0.6;
+  cursor: pointer;
+  transition: opacity 150ms ease, border-color 150ms ease;
+}
+
+shop-product-media .thumb img,
+.image-film-thumb img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: 4px;
+  object-fit: cover;
+}
+
+shop-product-media .thumb:hover,
+.image-film-thumb:hover {
+  opacity: 1;
+}
+
+shop-product-media .thumb[data-selected],
+.image-film-thumb[data-selected] {
+  border-color: currentColor;
+  box-shadow: 0 0 0 1px currentColor;
+  opacity: 1;
+}
+
+shop-product-media .thumb:focus-visible,
+.image-film-thumb:focus-visible {
+  outline: none;
+  box-shadow: var(--shop-focus-ring);
+}
+
+/* ---------------------------------------------------------------- lightbox
+   A contained panel over the page, not a full-screen takeover. */
+
+.image-backdrop {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100dvh;
+  max-width: none;
+  max-height: none;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: rgb(28 30 27 / 52%);
+  backdrop-filter: blur(8px) saturate(0.7);
+  transition: opacity 200ms ease;
+}
+
+.image-backdrop[data-starting-style],
+.image-backdrop[data-ending-style] {
+  opacity: 0;
+}
+
+ui-dialog-content.image-viewer {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  width: min(1040px, calc(100vw - 96px));
+  height: min(840px, calc(100dvh - 96px));
+  max-width: none;
+  max-height: none;
+  margin: auto;
+  padding: 0;
+  border: 1px solid rgb(255 255 255 / 60%);
+  border-radius: 22px;
+  overflow: hidden;
+  background: #faf9f6;
+  color: #262c28;
+  box-shadow: 0 40px 120px rgb(0 0 0 / 28%), 0 8px 24px rgb(0 0 0 / 12%);
+  font: 14px system-ui, sans-serif;
+  box-sizing: border-box;
+  transition: opacity 220ms ease, transform 220ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+ui-dialog-content.image-viewer[data-starting-style],
+ui-dialog-content.image-viewer[data-ending-style] {
+  opacity: 0;
+  transform: translateY(10px) scale(0.985);
+}
+
+.image-viewer shop-product-media-lightbox,
+.image-viewer .lightbox {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.image-viewer-head {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px 24px;
+  border-bottom: 1px solid #e6e6e0;
+}
+
+.image-viewer-heading {
+  min-width: 0;
+}
+
+.image-viewer-eyebrow {
+  display: block;
+  margin-bottom: 5px;
+  color: #747a6e;
+  font: 9px ui-monospace, monospace;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.image-viewer ui-dialog-title {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 18px;
+  font-weight: 500;
+  letter-spacing: -0.025em;
+}
+
+.image-viewer-stage {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  margin: 0 18px;
+  background: #f4f4f4;
+}
+
+.lightbox-viewport {
+  height: 100%;
+}
+
+.lightbox-track {
+  display: flex;
+  height: 100%;
+}
+
+.lightbox-slide {
+  position: relative;
+  flex: 0 0 100%;
+  min-width: 0;
+  height: 100%;
+}
+
+.lightbox-image {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.image-control {
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  padding: 0;
+  border: 1px solid rgb(255 255 255 / 18%);
+  border-radius: 50%;
+  color: #fff;
+  background: rgb(38 44 40 / 88%);
+  box-shadow: 0 4px 12px rgb(0 0 0 / 12%);
+  cursor: pointer;
+  transition: background 160ms ease;
+}
+
+.image-control:hover {
+  background: #1d3528;
+}
+
+.image-control:focus-visible {
+  outline: none;
+  box-shadow: var(--shop-focus-ring);
+}
+
+.image-close {
+  width: 40px;
+  height: 40px;
+  flex: none;
+  color: #555e54;
+  background: transparent;
+  border-color: #d5d7cf;
+  box-shadow: none;
+}
+
+.image-close:hover {
+  background: #e9ece4;
+}
+
+.image-previous,
+.image-next {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 1;
+}
+
+.image-previous {
+  left: 16px;
+}
+
+.image-next {
+  right: 16px;
+}
+
+.image-viewer-foot {
+  flex: none;
+  padding: 12px 24px 14px;
+}
+
+.image-viewer-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  min-height: 1.4em;
+  color: #5f665b;
+  font-size: 11.5px;
+}
+
+.image-caption {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.image-counter {
+  flex: none;
+  font: 11px ui-monospace, monospace;
+  font-variant-numeric: tabular-nums;
+}
+
+.image-filmstrip {
+  display: flex;
+  justify-content: safe center;
+  gap: 8px;
+  margin-top: 10px;
+  padding: 3px 2px;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+.image-film-thumb {
+  flex: none;
+  width: 46px;
+}
+
+.image-key-hint {
+  margin: 8px 0 0;
+  text-align: center;
+  color: #7c8277;
+  font: 9.5px ui-monospace, monospace;
+}
+
+.image-key-hint span {
+  margin-inline: 8px;
+}
+
+@media (max-width: 600px) {
+  ui-dialog-content.image-viewer {
+    width: calc(100vw - 24px);
+    height: min(680px, calc(100dvh - 64px));
+    border-radius: 16px;
+  }
+  .image-viewer-head {
+    padding: 12px 16px;
+  }
+  .image-viewer-stage {
+    margin-inline: 8px;
+  }
+  .image-viewer-foot {
+    padding: 10px 16px;
+  }
+  .image-previous {
+    left: 8px;
+  }
+  .image-next {
+    right: 8px;
+  }
+  .image-control:not(.image-close) {
+    width: 44px;
+    height: 44px;
+  }
+  .image-key-hint {
+    display: none;
+  }
+}
+
+@media (max-height: 600px) {
+  .image-viewer-head {
+    padding-block: 8px;
+  }
+  .image-viewer-foot {
+    padding-block: 6px;
+  }
+  .image-film-thumb {
+    width: 36px;
+  }
+  .image-key-hint {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  shop-product-media .media-image,
+  .image-backdrop,
+  ui-dialog-content.image-viewer,
+  .media-hint,
+  .media-step,
+  .image-control,
+  .thumb,
+  .image-film-thumb {
+    transition: none;
+  }
+}

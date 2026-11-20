@@ -1,0 +1,26 @@
+{
+  "name": "shopify-storefront-ux-sdk",
+  "version": "0.1.0",
+  "description": "Accessible, agent-ready storefront components for Shopify's Storefront API: images, prices, variant selectors, product media, products, bundles and a cart, built on ui-sdk.",
+  "type": "module",
+  "license": "MIT",
+  "repository": { "type": "git", "url": "https://github.com/tobi/shopify-storefront-ux-sdk" },
+  "keywords": ["shopify", "storefront-api", "web-components", "ui-sdk", "accessibility", "cart", "product-gallery"],
+  "exports": {
+    ".": "./src/index.ts",
+    "./styles.css": "./src/shop.css"
+  },
+  "files": ["src", "README.md", "LICENSE"],
+  "sideEffects": ["./src/index.ts", "./src/web/*.ts", "*.css"],
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "bun test"
+  },
+  "dependencies": {
+    "@ui-sdk/core": "0.1.0-beta.5",
+    "@ui-sdk/web": "0.1.0-beta.5"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3"
+  }
+}

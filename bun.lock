@@ -1,0 +1,23 @@
+{
+  "lockfileVersion": 1,
+  "configVersion": 1,
+  "workspaces": {
+    "": {
+      "name": "shopify-storefront-ux-sdk",
+      "dependencies": {
+        "@ui-sdk/core": "0.1.0-beta.5",
+        "@ui-sdk/web": "0.1.0-beta.5",
+      },
+      "devDependencies": {
+        "typescript": "^5.9.3",
+      },
+    },
+  },
+  "packages": {
+    "@ui-sdk/core": ["@ui-sdk/core@0.1.0-beta.5", "", {}, "sha512-dmunrxWrZ+vwldKJ6THQNYyyfbLFY6K82hBvIZSnuGwpEQmXKmM0iuANgGXtaqw8unSB2p9E5s3y7zfE9rgP6Q=="],
+
+    "@ui-sdk/web": ["@ui-sdk/web@0.1.0-beta.5", "", { "peerDependencies": { "@ui-sdk/core": "^0.1.0-beta.5" } }, "sha512-Ufgux0iewhxAA1bmxTZB0EI3fqZPnV5cJpUKxG79d3peXgQTYnblvUIRnChDVyfmYHL3w55fBeM6J+5yAr6zTg=="],
+
+    "typescript": ["typescript@5.9.3", "", { "bin": { "tsc": "bin/tsc", "tsserver": "bin/tsserver" } }, "sha512-jl1vZzPDinLr9eUt3J/t7V6FgNEw9QjvBPdysz9KfQDD41fQrC2Y4vKQdiaUpFT4bXlb1RHhLpp8wtm6M5TgSw=="],
+  }
+}
