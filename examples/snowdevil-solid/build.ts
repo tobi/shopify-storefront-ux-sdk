@@ -4,6 +4,7 @@ const result = await Bun.build({
   entrypoints: ["./src/index.html"],
   outdir: "./dist",
   minify: true,
+  define: { "process.env.NODE_ENV": '"production"' },
   plugins: [solid],
 })
 if (!result.success) {

@@ -110,7 +110,7 @@ function CartLines(props: { empty?: JSX.Element; children: LineProps["children"]
           <NumberInputDecrement aria-label={current().quantity === 1 ? `Remove ${lineName(current())}` : "Decrease quantity"}>
             {current().quantity === 1 ? <TrashIcon /> : "−"}
           </NumberInputDecrement>
-          <NumberInputControl />
+          <NumberInputControl aria-label={`Quantity, ${lineName(current())}`} />
           <NumberInputIncrement aria-label="Increase quantity">+</NumberInputIncrement>
         </NumberInputGroup>
       </NumberInput>

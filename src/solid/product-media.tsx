@@ -175,7 +175,6 @@ function ShopProductMedia(
                       <button
                         type="button"
                         class="media-open"
-                        aria-label={`Enlarge ${handle.api.internal.altFor(index())}`}
                         onClick={(event) => {
                           handle.api.setValue(index(), { reason: "item-press", event })
                           handle.api.setOpen(true, { reason: "trigger-press", event })

@@ -358,7 +358,7 @@ function ProductQuantity(props: { label?: string }) {
     >
       <NumberInputGroup>
         <NumberInputDecrement aria-label="Decrease quantity">−</NumberInputDecrement>
-        <NumberInputControl />
+        <NumberInputControl aria-label={props.label ?? "Quantity"} />
         <NumberInputIncrement aria-label="Increase quantity">+</NumberInputIncrement>
       </NumberInputGroup>
     </NumberInput>

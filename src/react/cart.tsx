@@ -151,7 +151,7 @@ function CartLines({
           >
             {line.quantity === 1 ? <TrashIcon /> : "−"}
           </NumberInputDecrement>
-          <NumberInputControl />
+          <NumberInputControl aria-label={`Quantity, ${lineName(line)}`} />
           <NumberInputIncrement aria-label="Increase quantity">+</NumberInputIncrement>
         </NumberInputGroup>
       </NumberInput>

@@ -313,6 +313,7 @@ const shopCart = definePrimitive({
   },
   slots: (slot) => ({
     root: slot<{}, ShopCartState>({
+      role: "region",
       state: cartState,
       attrs: (state) => ({
         "data-status": state.status,

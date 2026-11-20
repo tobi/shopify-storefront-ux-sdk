@@ -25,7 +25,8 @@ button, input, select, textarea { font: inherit; color: inherit; }
 img { max-width: 100%; display: block; }
 :focus-visible { outline: none; box-shadow: var(--focus); }
 .visually-hidden { position: absolute !important; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
-.eyebrow { margin: 0 0 6px; font: 700 11px/1 ui-monospace, monospace; letter-spacing: 0.14em; text-transform: uppercase; color: var(--devil); }
+.eyebrow { margin: 0 0 6px; font: 700 11px/1 ui-monospace, monospace; letter-spacing: 0.14em; text-transform: uppercase; color: #b8141c; }
+.hero .eyebrow { color: #ff6b72; }
 .fine { font-size: 13px; color: var(--muted); margin: 0; }
 
 /* Masthead */

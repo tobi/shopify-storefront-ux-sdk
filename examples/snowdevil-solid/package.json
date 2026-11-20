@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "bun --hot ./index.ts",
     "build": "NODE_ENV=production bun ./build.ts",
+    "start": "NODE_ENV=production bun ./build.ts && NODE_ENV=production bun ./index.ts",
     "typecheck": "tsc --noEmit -p ."
   },
   "dependencies": {

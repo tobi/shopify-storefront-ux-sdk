@@ -138,6 +138,7 @@ const shopProduct = definePrimitive({
   },
   slots: (slot) => ({
     root: slot<{}, ShopProductState>({
+      role: "region",
       state: (state) => ({
         quantity: state.quantity,
         available: Boolean(state.variant?.availableForSale),

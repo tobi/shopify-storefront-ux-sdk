@@ -359,7 +359,7 @@ function ProductQuantity({ label = "Quantity" }: { label?: string }) {
     >
       <NumberInputGroup>
         <NumberInputDecrement aria-label="Decrease quantity">−</NumberInputDecrement>
-        <NumberInputControl />
+        <NumberInputControl aria-label={label} />
         <NumberInputIncrement aria-label="Increase quantity">+</NumberInputIncrement>
       </NumberInputGroup>
     </NumberInput>
