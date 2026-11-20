@@ -33,8 +33,11 @@ TypeScript, like Vite, works the same way):
 
 ```sh
 bun init -y
-bun add github:tobi/shopify-storefront-ux-sdk @ui-sdk/web @ui-sdk/core
+bun add github:tobi/shopify-storefront-ux-sdk @ui-sdk/web@0.1.0-beta.5 @ui-sdk/core@0.1.0-beta.5
 ```
+
+ui-sdk is a peer dependency, pinned to the beta this is built and tested
+against, so your page and the library share one copy of each element.
 
 `main.ts` registers the elements and the SDK controls your markup uses:
 
