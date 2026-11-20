@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test"
 import { imageAttrs, type Image } from "../src/images"
 import { searchString, shopCatalog, visibleProducts } from "../src/primitives/catalog"
+import { shopCart } from "../src/primitives/cart"
 import { shopMarketSelector } from "../src/primitives/market-selector"
 import { shopPrice } from "../src/primitives/price"
 import { shopProductMedia } from "../src/primitives/product-media"
@@ -335,8 +336,17 @@ describe("shop-market-selector", () => {
     expect(market.api.getMarket().country).toBe("US")
     cancel = false
     expect(market.api.setCountry("DE")).toBe(true)
-    expect(market.api.getMarket()).toMatchObject({ country: "DE", currency: "EUR", symbol: "€" })
+    expect(market.api.getMarket()).toMatchObject({ country: "DE", currency: "EUR", symbol: "€", hasMultipleCurrencies: true })
     expect(shopConfig().country).toBe("DE")
+
+    // Re-syncing shopCart with unchanged options (like a React re-render) must not clobber the market choice.
+    const cartInstance = shopCart({ id: "cart-mkt", country: "CA", language: "en" })
+    expect(market.api.setCountry("DE")).toBe(true)
+    cartInstance.setOptions({ country: "CA", language: "en" })
+    expect(shopConfig().country).toBe("DE")
+    expect(market.api.getMarket().country).toBe("DE")
+    cartInstance.destroy()
+
     market.destroy()
     configureShop({ country: prev.country, language: prev.language })
   })

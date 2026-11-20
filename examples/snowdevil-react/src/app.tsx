@@ -88,7 +88,7 @@ function App() {
             <span>Snowdevil</span>
           </a>
           <div className="masthead-actions">
-            <ShopMarketSelector className="market" />
+            <ShopMarketSelector className="market" storageKey="snowdevil.react.market" />
             <DrawerTrigger className="bag-trigger">
               <span>Bag</span>
               <CartCount className="bag-count" />

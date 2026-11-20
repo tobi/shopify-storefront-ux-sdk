@@ -141,7 +141,20 @@ const shopCart = definePrimitive({
   },
   api: (context) => {
     const { store, options } = context
-    context.onOptions((next) => configureShop(configOf(next)))
+    let lastConfig = configOf(options())
+    context.onOptions((next) => {
+      const incoming = configOf(next)
+      const changed: Partial<ShopConfig> = {}
+      let hasChange = false
+      for (const key of Object.keys(incoming) as (keyof ShopConfig)[]) {
+        if (incoming[key] !== lastConfig[key]) {
+          ;(changed as Record<string, unknown>)[key] = incoming[key]
+          hasChange = true
+        }
+      }
+      lastConfig = incoming
+      if (hasChange) configureShop(changed)
+    })
 
     let first = true
     context.onDestroy(

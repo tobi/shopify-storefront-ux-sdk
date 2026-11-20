@@ -9,11 +9,13 @@ import {
   type MarketLanguage,
 } from "../shop"
 
-type MarketChangeReason = "item-press" | "imperative"
+type MarketChangeReason = "input" | "item-press" | "imperative"
 
 type ShopMarketSelectorOptions = {
   /** Storefront API URL. Defaults to the configured shop endpoint. */
   endpoint?: string
+  /** Optional localStorage key to persist the shopper's chosen market across reloads. */
+  storageKey?: string
   /** Optional explicit list of countries (skips network fetch if provided). */
   countries?: MarketCountry[]
   /** Controlled country ISO code (e.g. "CA", "US", "GB"). */
@@ -42,6 +44,7 @@ type ShopMarketSelectorState = {
   currency: string
   symbol: string
   countryName: string
+  hasMultipleCurrencies: boolean
   status: MarketStatus
   countries: MarketCountry[]
   languages: MarketLanguage[]
@@ -49,6 +52,9 @@ type ShopMarketSelectorState = {
 
 const currentCountryOf = (state: State) =>
   state.countries.find((entry) => entry.isoCode.toUpperCase() === state.country.toUpperCase()) ?? null
+
+const hasMultipleCurrenciesOf = (countries: readonly MarketCountry[]) =>
+  new Set(countries.map((c) => c.currency.isoCode)).size > 1
 
 const marketState = (state: State): ShopMarketSelectorState => {
   const active = currentCountryOf(state)
@@ -58,9 +64,31 @@ const marketState = (state: State): ShopMarketSelectorState => {
     currency: active?.currency.isoCode ?? "",
     symbol: active?.currency.symbol ?? "",
     countryName: active?.name ?? state.country,
+    hasMultipleCurrencies: hasMultipleCurrenciesOf(state.countries),
     status: state.status,
     countries: state.countries,
     languages: active?.availableLanguages ?? [],
+  }
+}
+
+function readStoredMarket(storageKey?: string): { country?: string; language?: string } | null {
+  if (!storageKey) return null
+  try {
+    const raw = globalThis.localStorage?.getItem(storageKey)
+    if (!raw) return null
+    const parsed = JSON.parse(raw) as unknown
+    return parsed && typeof parsed === "object" ? (parsed as { country?: string; language?: string }) : null
+  } catch {
+    return null
+  }
+}
+
+function writeStoredMarket(storageKey: string | undefined, value: { country: string; language: string }) {
+  if (!storageKey) return
+  try {
+    globalThis.localStorage?.setItem(storageKey, JSON.stringify(value))
+  } catch {
+    // private browsing
   }
 }
 
@@ -76,6 +104,7 @@ const shopMarketSelector = definePrimitive({
   name: "shop-market-selector",
   options: {
     endpoint: "string",
+    storageKey: "string",
     countries: "value",
     country: "string",
     defaultCountry: "string",
@@ -87,10 +116,13 @@ const shopMarketSelector = definePrimitive({
   controlled: ["country", "language"],
   state: (options: ShopMarketSelectorOptions): State => {
     const cfg = shopConfig()
+    const saved = options.country === undefined ? readStoredMarket(options.storageKey) : null
     const countries = options.countries ?? []
+    const country = (options.country ?? saved?.country ?? options.defaultCountry ?? cfg.country).toUpperCase()
+    const language = (options.language ?? saved?.language ?? options.defaultLanguage ?? cfg.language).toUpperCase()
     return {
-      country: (options.country ?? options.defaultCountry ?? cfg.country).toUpperCase(),
-      language: (options.language ?? options.defaultLanguage ?? cfg.language).toUpperCase(),
+      country,
+      language,
       countries,
       status: countries.length ? "idle" : "loading",
       error: null,
@@ -141,7 +173,18 @@ const shopMarketSelector = definePrimitive({
       }),
     )
     context.onOptions(() => void load())
-    queueMicrotask(() => void load())
+    queueMicrotask(() => {
+      const saved = options().country === undefined ? readStoredMarket(options().storageKey) : null
+      if (saved?.country) {
+        const nextCountry = saved.country.toUpperCase()
+        const nextLanguage = (saved.language ?? store.get().language).toUpperCase()
+        store.set({ country: nextCountry, language: nextLanguage })
+        if (nextCountry !== shopConfig().country.toUpperCase()) {
+          configureShop({ country: nextCountry, language: nextLanguage })
+        }
+      }
+      void load()
+    })
     context.onDestroy(() => controller?.abort())
 
     return {
@@ -153,9 +196,10 @@ const shopMarketSelector = definePrimitive({
         const countries = store.get().countries
         const match = countries.find((entry) => entry.isoCode.toUpperCase() === next)
         if (countries.length && !match) return false
-        const reason = details.reason ?? (details.event ? "item-press" : "imperative")
+        const reason = details.reason ?? (details.event ? "input" : "imperative")
         const accepted = change("country", next, { reason, event: details.event })
         if (!accepted) return false
+        writeStoredMarket(options().storageKey, { country: next, language: store.get().language })
         configureShop({ country: next })
         if (match) announce(`Market set to ${match.name} (${match.currency.isoCode}).`)
         return true
@@ -163,9 +207,10 @@ const shopMarketSelector = definePrimitive({
       setLanguage: (isoCode: string, details: { reason?: MarketChangeReason; event?: Event } = {}) => {
         const next = isoCode.trim().toUpperCase()
         if (!next) return false
-        const reason = details.reason ?? (details.event ? "item-press" : "imperative")
+        const reason = details.reason ?? (details.event ? "input" : "imperative")
         const accepted = change("language", next, { reason, event: details.event })
         if (!accepted) return false
+        writeStoredMarket(options().storageKey, { country: store.get().country, language: next })
         configureShop({ language: next })
         return true
       },
@@ -183,6 +228,7 @@ const shopMarketSelector = definePrimitive({
         "aria-label": "Country and currency",
         "data-country": state.country,
         "data-currency": currentCountryOf(state)?.currency.isoCode,
+        "data-multi-currency": hasMultipleCurrenciesOf(state.countries) ? "" : undefined,
         "data-status": state.status,
       }),
     }),

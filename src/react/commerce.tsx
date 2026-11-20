@@ -179,6 +179,7 @@ function ShopPromise({
 
 function ShopMarketSelector({
   endpoint,
+  storageKey,
   countries,
   country,
   defaultCountry,
@@ -192,6 +193,7 @@ function ShopMarketSelector({
   const cart = useCart()
   const handle = usePrimitive(shopMarketSelector, {
     endpoint: endpoint ?? cart.endpoint,
+    storageKey,
     countries,
     country,
     defaultCountry,
@@ -212,7 +214,7 @@ function ShopMarketSelector({
           value={state.country}
           onChange={(event) =>
             handle.api.setCountry(event.currentTarget.value, {
-              reason: "item-press",
+              reason: "input",
               event: event.nativeEvent,
             })
           }

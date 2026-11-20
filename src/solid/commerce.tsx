@@ -192,6 +192,7 @@ function ShopMarketSelector(
   const cart = useCart()
   const handle = usePrimitive(shopMarketSelector, () => ({
     endpoint: props.endpoint ?? cart.endpoint(),
+    storageKey: props.storageKey,
     countries: props.countries,
     country: props.country,
     defaultCountry: props.defaultCountry,
@@ -203,6 +204,7 @@ function ShopMarketSelector(
   const rest = omit(
     props,
     "endpoint",
+    "storageKey",
     "countries",
     "country",
     "defaultCountry",
@@ -224,7 +226,7 @@ function ShopMarketSelector(
           value={state.country}
           onChange={(event) =>
             handle.api.setCountry((event.currentTarget as HTMLSelectElement).value, {
-              reason: "item-press",
+              reason: "input",
               event,
             })
           }

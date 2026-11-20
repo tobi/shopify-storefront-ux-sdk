@@ -13,7 +13,7 @@ const parts = createParts(shopMarketSelector, {
 
       const onChange = (event: Event) => {
         const value = (event.target as HTMLSelectElement).value
-        if (value) instance.api.setCountry(value, { reason: "item-press", event })
+        if (value) instance.api.setCountry(value, { reason: "input", event })
       }
       select?.addEventListener("change", onChange)
 
